@@ -6,7 +6,7 @@
 
 ;; Created: 13 Feb 2023
 ;; Version: 0.1
-;; Package-Requires: ((emacs "28.2") (rustic "3.0"))
+;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0"))
 ;; Keywords: convenience, languages
 
 ;; This file is not part of GNU Emacs.
@@ -18,6 +18,7 @@
 
 ;; This file implements support for Verus programming in Emacs, including:
 ;;
+;; * Invoking Verus verification
 ;; * TODO Syntax highlighting
 ;; * TODO Unicode math (prettify-symbols-mode)
 ;; * TODO Relative indentation
@@ -33,6 +34,7 @@
 
 (require 'auto-minor-mode)
 (require 'rustic)
+(require 'f)
 
 ;;; Customization
 
@@ -47,9 +49,18 @@ May be either nil (use $VERUS_HOME) or an absolute path."
   :type 'directory
   :risky t)
 
+(defcustom verus-verify-location "source/tools/rust-verify.sh"
+  "Where to find the Verus verification script, relative to `verus-home'."
+  :group 'verus
+  :type 'file
+  :risky t)
+
 (defcustom verus-analyzer nil
-  "Where to find Verus.
-Must be an an absolute path."
+  "Where to find Verus Analyzer.
+Specifically, this must be an absolute path pointing to the
+directory containing a checkout of
+https://github.com/verus-lang/rust-analyzer/tree/verus that has
+had `cargo build --release' run in it."
   :group 'verus
   :type 'directory
   :risky t)
@@ -58,22 +69,37 @@ Must be an an absolute path."
 
 (defvar verus-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") 'verus-run)
+    (define-key map (kbd "C-c C-c C-c") 'verus-run)
     map))
 
 ;;; Mode definition
 
+;; TODO FIXME: Get rustic to actually use the right lsp server
 (defvar-local verus--old-lsp-server rustic-lsp-server)
+(defvar-local verus--old-rutic-analyzer-command rustic-analyzer-command)
+(defvar-local verus--rust-verify nil)
 
 (defun verus--setup ()
   "Setup Verus mode."
-  ;; TODO FIXME
-  (setq-local rustic-lsp-server 'rust-analyzer))
+  (if (not verus-home)
+      (setq verus-home (getenv "VERUS_HOME")))
+  (if (or (not verus-home) (not (file-exists-p verus-home)))
+      (error "Verus home directory %s does not exist." verus-home))
+  (setq verus--rust-verify (f-join verus-home verus-verify-location))
+  (if (not verus-analyzer)
+      (message "The variable verus-analyzer must be set to properly use Verus mode.")
+    (let ((analyzer (concat verus-analyzer "/target/release/rust-analyzer")))
+      (if (not (file-exists-p analyzer))
+          (message "The file %s does not exist.  Are you sure you ran 'cargo build --release' in the correct path?" analyzer)
+        (setq-local rustic-lsp-server 'rust-analyzer)
+        (setq-local rustic-analyzer-command analyzer)))))
 
 (defun verus--cleanup ()
   "Cleanup Verus mode."
-  (setq-local rustic-lsp-server verus--old-lsp-server))
+  (setq-local rustic-lsp-server verus--old-lsp-server)
+  (setq-local rustic-analyzer-command verus--old-rutic-analyzer-command))
 
+;;;###autoload
 (define-minor-mode verus-mode
   "Toggle Verus mode."
         :lighter " verus"
@@ -85,13 +111,30 @@ Must be an an absolute path."
 
 ;;; Commands
 
+(defun verus--crate-root-file ()
+  "Find the root of the current crate. Usually either `main.rs' or `lib.rs'."
+  (let ((root (locate-dominating-file default-directory "Cargo.toml")))
+    (unless root
+      (error "Not in a crate"))
+    (let ((lib (f-join root "src/lib.rs"))
+          (main (f-join root "src/main.rs")))
+      (if (file-exists-p lib)
+          lib
+        (if (file-exists-p main)
+            main
+          (error "Could not find crate root file."))))))
+
 (defun verus-run ()
   "Run Verus on the current file."
   (interactive)
   (let ((file (buffer-file-name)))
     (if (not file)
-        (message "Buffer is not visiting a file")
-      (message "NOT YET IMPLEMENTED"))))
+        (message "Buffer is not visiting a file. Cannot run Verus.")
+      (let ((default-directory (f-dirname file)))
+        (compile
+         (concat (shell-quote-argument verus--rust-verify)
+                 " "
+                 (shell-quote-argument (verus--crate-root-file))))))))
 
 ;;; Auto-minor-mode
 
@@ -102,11 +145,11 @@ This is done by checking if the file contains a string that is
 curly brace"
   (save-excursion
     (goto-char (point-min))
-    (re-search-forward "^verus! *{" nil t)))
+    (re-search-forward "^verus! *{$" nil t)))
 
-(add-to-list
- 'auto-minor-mode-magic-alist
- '(verus--is-verus-file . verus-mode))
+;;;###autoload
+(add-to-list 'auto-minor-mode-magic-alist
+             '(verus--is-verus-file . verus-mode))
 
 (provide 'verus-mode)
 ;;; verus-mode.el ends here
