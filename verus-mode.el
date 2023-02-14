@@ -32,7 +32,6 @@
 
 ;;; Imports
 
-(require 'auto-minor-mode)
 (require 'rustic)
 (require 'f)
 
@@ -100,14 +99,26 @@ had `cargo build --release' run in it."
   (setq-local rustic-analyzer-command verus--old-rutic-analyzer-command))
 
 ;;;###autoload
-(define-minor-mode verus-mode
-  "Toggle Verus mode."
-        :lighter " verus"
-        :keymap verus-mode-map
-        :group 'verus
-        (if verus-mode
-            (verus--setup)
-          (verus--cleanup)))
+(define-derived-mode verus-mode rustic-mode "Verus"
+  "Major mode for Verus code.
+
+\\{rustic-mode-map}"
+  :group 'verus
+  :keymap verus-mode-map
+  (verus--setup))
+;; TODO: Handle cleanup?
+
+(defun verus--is-verus-file ()
+  "Return non-nil if the current buffer is a Verus file.
+This is done by checking if the file contains a string that is
+'verus!' followed by any number of spaces, and then an opening
+curly brace"
+  (save-excursion
+    (goto-char (point-min))
+    (re-search-forward "^verus! *{$" nil t)))
+
+;;;###autoload
+(add-to-list 'magic-mode-alist (cons #'verus--is-verus-file #'verus-mode))
 
 ;;; Commands
 
@@ -135,21 +146,6 @@ had `cargo build --release' run in it."
          (concat (shell-quote-argument verus--rust-verify)
                  " "
                  (shell-quote-argument (verus--crate-root-file))))))))
-
-;;; Auto-minor-mode
-
-(defun verus--is-verus-file ()
-  "Return non-nil if the current buffer is a Verus file.
-This is done by checking if the file contains a string that is
-'verus!' followed by any number of spaces, and then an opening
-curly brace"
-  (save-excursion
-    (goto-char (point-min))
-    (re-search-forward "^verus! *{$" nil t)))
-
-;;;###autoload
-(add-to-list 'auto-minor-mode-magic-alist
-             '(verus--is-verus-file . verus-mode))
 
 (provide 'verus-mode)
 ;;; verus-mode.el ends here
