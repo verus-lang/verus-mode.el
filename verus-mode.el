@@ -93,6 +93,20 @@ that has had `cargo xtask dist && gunzip
   (highlight-regexp "\\_<int\\_>" font-lock-keyword-face)
   (highlight-regexp "\\_<nat\\_>" font-lock-keyword-face))
 
+;;; Compilation mode setup
+
+(defun verus--compilation-mode-setup ()
+  "Setup compilation mode for Verus."
+  ;; Recognize Verus errors that look like:
+  ;; --> [filename]:[line]:[column]
+  (if (not (assoc 'verus compilation-error-regexp-alist-alist))
+      (add-to-list 'compilation-error-regexp-alist-alist
+                   '(verus
+                     "^ *--> \\(.+\\):\\([0-9]+\\):\\([0-9]+\\)"
+                     1 2 3)))
+  (if (not (member 'verus compilation-error-regexp-alist))
+      (add-to-list 'compilation-error-regexp-alist 'verus)))
+
 ;;; Mode definition
 
 ;; TODO FIXME: Get rustic to actually use the right lsp server
@@ -118,8 +132,8 @@ that has had `cargo xtask dist && gunzip
         (setq-local rustic-analyzer-command analyzer))))
   ;; TEMPORARY FIXME: Disable format-on-save until we have verusfmt
   (setq-local rustic-format-on-save nil)
-  ;; Enable syntax highlighting
-  (verus--syntax-highlight))
+  (verus--syntax-highlight)
+  (verus--compilation-mode-setup))
 
 (defun verus--cleanup ()
   "Cleanup Verus mode."
