@@ -58,8 +58,10 @@ May be either nil (use $VERUS_HOME) or an absolute path."
   "Where to find Verus Analyzer.
 Specifically, this must be an absolute path pointing to the
 directory containing a checkout of
-https://github.com/verus-lang/rust-analyzer/tree/verus that has
-had `cargo build --release' run in it."
+https://github.com/verus-lang/rust-analyzer/tree/november-08-2022
+that has had `cargo xtask dist && gunzip
+./dist/rust-analyzer-x86_64-apple-darwin.gz && chmod +x
+./dist/rust-analyzer-x86_64-apple-darwin' run in it."
   :group 'verus
   :type 'directory
   :risky t)
@@ -106,9 +108,11 @@ had `cargo build --release' run in it."
   (setq verus--rust-verify (f-join verus-home verus-verify-location))
   (if (not verus-analyzer)
       (message "The variable verus-analyzer must be set to properly use Verus mode.")
-    (let ((analyzer (concat verus-analyzer "/target/release/rust-analyzer")))
+    ;; FIXME: Use the right LSP server based on machine, currently this is
+    ;; hardcoded to macOS.
+    (let ((analyzer (concat verus-analyzer "/dist/rust-analyzer-x86_64-apple-darwin")))
       (if (not (file-exists-p analyzer))
-          (message "The file %s does not exist.  Are you sure you ran 'cargo build --release' in the correct path?" analyzer)
+          (message "The file %s does not exist.  Are you sure you ran 'cargo xtask dist' etc. in the correct path?" analyzer)
         (setq-local rustic-lsp-server 'rust-analyzer)
         (setq-local rustic-analyzer-command analyzer))))
   ;; TEMPORARY FIXME: Disable format-on-save until we have verusfmt
