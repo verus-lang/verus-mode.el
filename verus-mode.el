@@ -78,6 +78,7 @@ that has had `cargo xtask dist && gunzip
 
 ;; TODO FIXME: Actually do this properly, rather than by using highlights
 (defun verus--syntax-highlight ()
+  "Highlight Verus keywords."
   (highlight-regexp "\\_<assume\\_>" font-lock-warning-face)
   (highlight-regexp "\\_<assert\\_>" font-lock-keyword-face)
   (highlight-regexp "\\_<ensures\\_>" font-lock-keyword-face)
@@ -104,7 +105,7 @@ that has had `cargo xtask dist && gunzip
   (if (not verus-home)
       (setq verus-home (getenv "VERUS_HOME")))
   (if (or (not verus-home) (not (file-exists-p verus-home)))
-      (error "Verus home directory %s does not exist." verus-home))
+      (error "Verus home directory %s does not exist" verus-home))
   (setq verus--rust-verify (f-join verus-home verus-verify-location))
   (if (not verus-analyzer)
       (message "The variable verus-analyzer must be set to properly use Verus mode.")
