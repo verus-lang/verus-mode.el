@@ -71,6 +71,24 @@ had `cargo build --release' run in it."
     (define-key map (kbd "C-c C-c C-c") 'verus-run)
     map))
 
+;;; Syntax highlighting
+
+;; TODO FIXME: Actually do this properly, rather than by using highlights
+(defun verus--syntax-highlight ()
+  (highlight-regexp "\\_<assume\\_>" font-lock-warning-face)
+  (highlight-regexp "\\_<assert\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<ensures\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<requires\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<invariant\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<spec\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<proof\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<exec\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<open\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<closed\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<decreases\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<int\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<nat\\_>" font-lock-keyword-face))
+
 ;;; Mode definition
 
 ;; TODO FIXME: Get rustic to actually use the right lsp server
@@ -91,7 +109,11 @@ had `cargo build --release' run in it."
       (if (not (file-exists-p analyzer))
           (message "The file %s does not exist.  Are you sure you ran 'cargo build --release' in the correct path?" analyzer)
         (setq-local rustic-lsp-server 'rust-analyzer)
-        (setq-local rustic-analyzer-command analyzer)))))
+        (setq-local rustic-analyzer-command analyzer))))
+  ;; TEMPORARY FIXME: Disable format-on-save until we have verusfmt
+  (setq-local rustic-format-on-save nil)
+  ;; Enable syntax highlighting
+  (verus--syntax-highlight))
 
 (defun verus--cleanup ()
   "Cleanup Verus mode."
