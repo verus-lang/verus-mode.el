@@ -159,8 +159,34 @@ curly brace"
     (goto-char (point-min))
     (re-search-forward "^verus! *{$" nil t)))
 
+(defun verus--verus-mode-or-rust-mode ()
+  "Decide whether to use Verus mode or Rust mode."
+  (if (verus--is-verus-file)
+      (verus-mode)
+    (rust-mode)))
+
+(defun verus--verus-mode-or-rustic-mode ()
+  "Decide whether to use Verus mode or Rustic mode."
+  (if (verus--is-verus-file)
+      (verus-mode)
+    (rustic-mode)))
+
 ;;;###autoload
-(add-to-list 'magic-mode-alist (cons #'verus--is-verus-file #'verus-mode))
+(progn
+  ;; Note: This is a hack, we probably would like to do this with
+  ;; `magic-mode-alist', but for now, this works.
+  ;;
+  ;; In the future, we might wish to just have Verus use a separate file
+  ;; extension, such as `.vrs'.
+  ;;
+  ;; Any places that use `rust-mode' or `rustic-mode' in `auto-mode-alist' are
+  ;; updated to instead invoke `verus--verus-mode-or-rust-mode' or
+  ;; `verus--verus-mode-or-rustic-mode' respectively.
+  (dolist (mode auto-mode-alist)
+    (cond ((eq (cdr mode) 'rust-mode)
+           (setcdr mode 'verus--verus-mode-or-rust-mode))
+          ((eq (cdr mode) 'rustic-mode)
+           (setcdr mode 'verus--verus-mode-or-rustic-mode)))))
 
 ;;; Commands
 
