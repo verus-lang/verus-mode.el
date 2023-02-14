@@ -1,4 +1,4 @@
-;;; verus-mode --- Support for Verus programming -*- lexical-binding: t; indent-tabs-mode: nil -*-
+;;; verus-mode --- Support for Verus programming -*- lexical-binding: t; indent-tabs-mode: nil; no-byte-compile: t; -*-
 
 ;; Copyright (C) 2023 Jay Bosamiya
 ;; Author: Jay Bosamiya <verus@jaybosamiya.com>
@@ -22,6 +22,10 @@
 ;; * TODO Unicode math (prettify-symbols-mode)
 ;; * TODO Relative indentation
 ;; * TODO Real-time verification (Flycheck)
+
+;; Note: Byte-compilation is temporarily disabled on this package, to make it
+;; easier to develop verus-mode. It will be re-enabled at some point.
+
 
 ;;; Code:
 
