@@ -226,8 +226,9 @@ curly brace"
          (concat (shell-quote-argument verus--rust-verify)
                  " "
                  (shell-quote-argument (verus--crate-root-file))
-                 " --verify-module "
-                 (shell-quote-argument (f-base file))))))))
+                 (if (string= (verus--crate-root-file) file)
+                     " --verify-root"
+                   (concat " --verify-module " (shell-quote-argument (f-base file))))))))))
 
 (provide 'verus-mode)
 ;;; verus-mode.el ends here
