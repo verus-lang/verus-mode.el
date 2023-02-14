@@ -68,7 +68,8 @@ had `cargo build --release' run in it."
 
 (defvar verus-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c C-c") 'verus-run)
+    (define-key map (kbd "C-c C-c C-c") 'verus-run-on-file)
+    (define-key map (kbd "C-c C-c C-S-c") 'verus-run-on-crate)
     map))
 
 ;;; Syntax highlighting
@@ -155,10 +156,10 @@ curly brace"
           lib
         (if (file-exists-p main)
             main
-          (error "Could not find crate root file."))))))
+          (error "Could not find crate root file"))))))
 
-(defun verus-run ()
-  "Run Verus on the current file."
+(defun verus-run-on-crate ()
+  "Run Verus on the current crate."
   (interactive)
   (let ((file (buffer-file-name)))
     (if (not file)
@@ -168,6 +169,20 @@ curly brace"
          (concat (shell-quote-argument verus--rust-verify)
                  " "
                  (shell-quote-argument (verus--crate-root-file))))))))
+
+(defun verus-run-on-file ()
+  "Run Verus on the current file."
+  (interactive)
+  (let ((file (buffer-file-name)))
+    (if (not file)
+        (message "Buffer is not visiting a file. Cannot run Verus.")
+      (let ((default-directory (f-dirname file)))
+        (compile
+         (concat (shell-quote-argument verus--rust-verify)
+                 " "
+                 (shell-quote-argument (verus--crate-root-file))
+                 " --verify-module "
+                 (shell-quote-argument (f-base file))))))))
 
 (provide 'verus-mode)
 ;;; verus-mode.el ends here
