@@ -112,6 +112,7 @@ that has had `cargo xtask dist && gunzip
 ;; TODO FIXME: Get rustic to actually use the right lsp server
 (defvar-local verus--old-lsp-server rustic-lsp-server)
 (defvar-local verus--old-rutic-analyzer-command rustic-analyzer-command)
+(defvar-local verus--old-lsp-rust-analyzer-server-command nil) ; Copied at start
 (defvar-local verus--rust-verify nil)
 
 (defun verus--setup ()
@@ -129,7 +130,9 @@ that has had `cargo xtask dist && gunzip
       (if (not (file-exists-p analyzer))
           (message "The file %s does not exist.  Are you sure you ran 'cargo xtask dist' etc. in the correct path?" analyzer)
         (setq-local rustic-lsp-server 'rust-analyzer)
-        (setq-local rustic-analyzer-command analyzer))))
+        (setq-local verus--old-lsp-rust-analyzer-server-command lsp-rust-analyzer-server-command)
+        (setq-local lsp-rust-analyzer-server-command (list analyzer))
+        (setq-local rustic-analyzer-command (list analyzer)))))
   ;; TEMPORARY FIXME: Disable format-on-save until we have verusfmt
   (setq-local rustic-format-on-save nil)
   (verus--syntax-highlight)
@@ -138,17 +141,17 @@ that has had `cargo xtask dist && gunzip
 (defun verus--cleanup ()
   "Cleanup Verus mode."
   (setq-local rustic-lsp-server verus--old-lsp-server)
-  (setq-local rustic-analyzer-command verus--old-rutic-analyzer-command))
+  (setq-local rustic-analyzer-command verus--old-rutic-analyzer-command)
+  (setq-local lsp-rust-analyzer-server-command verus--old-lsp-rust-analyzer-server-command))
 
 ;;;###autoload
-(define-derived-mode verus-mode rustic-mode "Verus"
-  "Major mode for Verus code.
-
-\\{rustic-mode-map}"
+(define-minor-mode verus-mode
+  "Minor mode for verus code."
   :group 'verus
   :keymap verus-mode-map
-  (verus--setup))
-;; TODO: Handle cleanup?
+  (if verus-mode
+      (verus--setup)
+    (verus--cleanup)))
 
 (defun verus--is-verus-file ()
   "Return non-nil if the current buffer is a Verus file.
@@ -171,22 +174,30 @@ curly brace"
       (verus-mode)
     (rustic-mode)))
 
+;; ;;;###autoload
+;; (progn
+;;   ;; Note: This is a hack, we probably would like to do this with
+;;   ;; `magic-mode-alist', but for now, this works.
+;;   ;;
+;;   ;; In the future, we might wish to just have Verus use a separate file
+;;   ;; extension, such as `.vrs'.
+;;   ;;
+;;   ;; Any places that use `rust-mode' or `rustic-mode' in `auto-mode-alist' are
+;;   ;; updated to instead invoke `verus--verus-mode-or-rust-mode' or
+;;   ;; `verus--verus-mode-or-rustic-mode' respectively.
+;;   (dolist (mode auto-mode-alist)
+;;     (cond ((eq (cdr mode) 'rust-mode)
+;;            (setcdr mode 'verus--verus-mode-or-rust-mode))
+;;           ((eq (cdr mode) 'rustic-mode)
+;;            (setcdr mode 'verus--verus-mode-or-rustic-mode)))))
+
 ;;;###autoload
-(progn
-  ;; Note: This is a hack, we probably would like to do this with
-  ;; `magic-mode-alist', but for now, this works.
-  ;;
-  ;; In the future, we might wish to just have Verus use a separate file
-  ;; extension, such as `.vrs'.
-  ;;
-  ;; Any places that use `rust-mode' or `rustic-mode' in `auto-mode-alist' are
-  ;; updated to instead invoke `verus--verus-mode-or-rust-mode' or
-  ;; `verus--verus-mode-or-rustic-mode' respectively.
-  (dolist (mode auto-mode-alist)
-    (cond ((eq (cdr mode) 'rust-mode)
-           (setcdr mode 'verus--verus-mode-or-rust-mode))
-          ((eq (cdr mode) 'rustic-mode)
-           (setcdr mode 'verus--verus-mode-or-rustic-mode)))))
+(eval-after-load 'rustic-mode
+  '(progn
+     (add-hook 'rustic-mode-hook
+               (lambda ()
+                 (if (verus--is-verus-file)
+                     (verus-mode))))))
 
 ;;; Commands
 
@@ -239,6 +250,10 @@ If PREFIX is non-nil, then run ask for the command to run."
           (compile (if (= prefix 1)
                        compilation-command
                      (read-string "Run Verus: " compilation-command))))))))
+
+;; ;; Temporary
+;; (add-to-list 'lsp-language-id-configuration
+;;              '(verus-mode . "verus"))
 
 (provide 'verus-mode)
 ;;; verus-mode.el ends here
