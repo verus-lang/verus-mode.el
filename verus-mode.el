@@ -203,32 +203,42 @@ curly brace"
             main
           (error "Could not find crate root file"))))))
 
-(defun verus-run-on-crate ()
-  "Run Verus on the current crate."
-  (interactive)
-  (let ((file (buffer-file-name)))
-    (if (not file)
-        (message "Buffer is not visiting a file. Cannot run Verus.")
-      (let ((default-directory (f-dirname file)))
-        (compile
-         (concat (shell-quote-argument verus--rust-verify)
-                 " "
-                 (shell-quote-argument (verus--crate-root-file))))))))
+(defun verus-run-on-crate (prefix)
+  "Run Verus on the current crate.
 
-(defun verus-run-on-file ()
-  "Run Verus on the current file."
-  (interactive)
+If PREFIX is non-nil, then run ask for the command to run."
+  (interactive "p")
   (let ((file (buffer-file-name)))
     (if (not file)
         (message "Buffer is not visiting a file. Cannot run Verus.")
       (let ((default-directory (f-dirname file)))
-        (compile
-         (concat (shell-quote-argument verus--rust-verify)
-                 " "
-                 (shell-quote-argument (verus--crate-root-file))
-                 (if (string= (verus--crate-root-file) file)
-                     " --verify-root"
-                   (concat " --verify-module " (shell-quote-argument (f-base file))))))))))
+        (let ((compilation-command
+               (concat (shell-quote-argument verus--rust-verify)
+                       " "
+                       (shell-quote-argument (verus--crate-root-file)))))
+          (compile (if (= prefix 1)
+                       compilation-command
+                     (read-shell-command "Run Verus: " compilation-command))))))))
+
+(defun verus-run-on-file (prefix)
+  "Run Verus on the current file.
+
+If PREFIX is non-nil, then run ask for the command to run."
+  (interactive "p")
+  (let ((file (buffer-file-name)))
+    (if (not file)
+        (message "Buffer is not visiting a file. Cannot run Verus.")
+      (let ((default-directory (f-dirname file)))
+        (let ((compilation-command
+               (concat (shell-quote-argument verus--rust-verify)
+                       " "
+                       (shell-quote-argument (verus--crate-root-file))
+                       (if (string= (verus--crate-root-file) file)
+                           " --verify-root"
+                         (concat " --verify-module " (shell-quote-argument (f-base file)))))))
+          (compile (if (= prefix 1)
+                       compilation-command
+                     (read-string "Run Verus: " compilation-command))))))))
 
 (provide 'verus-mode)
 ;;; verus-mode.el ends here
