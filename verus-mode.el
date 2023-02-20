@@ -20,7 +20,7 @@
 ;;
 ;; * Invoking Verus verification
 ;; * TODO Syntax highlighting
-;; * TODO Unicode math (prettify-symbols-mode)
+;; * Unicode math (prettify-symbols-mode)
 ;; * TODO Relative indentation
 ;; * TODO Real-time verification (Flycheck)
 
@@ -93,6 +93,27 @@ that has had `cargo xtask dist && gunzip
   (highlight-regexp "\\_<int\\_>" font-lock-keyword-face)
   (highlight-regexp "\\_<nat\\_>" font-lock-keyword-face))
 
+;;; Unicode math (prettify-symbols-mode)
+
+(defcustom verus-symbols-alist
+  '(("exists" . ?∃) ("forall" . ?∀)
+    ("nat" . ?ℕ) ("int" . ?ℤ)
+    ("<==>" . ?⟺) ("==>" . ?⟹)
+    ("===" . ?⩶)
+    ("&&" . ?∧) ("||" . ?∨)
+    ("&&&" . ?⨇) ("|||" . ?⨈))
+  "Verus symbols."
+  :group 'verus
+  :type 'alist)
+
+(defun verus--prettify-symbols-setup ()
+  "Setup prettify-symbols for use with Verus."
+  (when (and (boundp 'prettify-symbols-alist)
+             (fboundp 'prettify-symbols-mode))
+    (setq-local prettify-symbols-alist (append verus-symbols-alist
+                                               prettify-symbols-alist))
+    (prettify-symbols-mode 1)))
+
 ;;; Compilation mode setup
 
 (defun verus--compilation-mode-setup ()
@@ -133,7 +154,8 @@ that has had `cargo xtask dist && gunzip
   ;; TEMPORARY FIXME: Disable format-on-save until we have verusfmt
   (setq-local rustic-format-on-save nil)
   (verus--syntax-highlight)
-  (verus--compilation-mode-setup))
+  (verus--compilation-mode-setup)
+  (verus--prettify-symbols-setup))
 
 (defun verus--cleanup ()
   "Cleanup Verus mode."
