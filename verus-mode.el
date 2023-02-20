@@ -101,7 +101,8 @@ that has had `cargo xtask dist && gunzip
     ("<==>" . ?⟺) ("==>" . ?⟹)
     ("===" . ?⩶)
     ("&&" . ?∧) ("||" . ?∨)
-    ("&&&" . ?⨇) ("|||" . ?⨈))
+    ("&&&" . ?⨇) ("|||" . ?⨈)
+    ("old" . ?⥀))
   "Verus symbols."
   :group 'verus
   :type 'alist)
