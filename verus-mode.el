@@ -218,15 +218,17 @@ curly brace"
 (defun verus--crate-root-file ()
   "Find the root of the current crate. Usually either `main.rs' or `lib.rs'."
   (let ((root (locate-dominating-file default-directory "Cargo.toml")))
-    (unless root
-      (error "Not in a crate"))
-    (let ((lib (f-join root "src/lib.rs"))
-          (main (f-join root "src/main.rs")))
-      (if (file-exists-p lib)
-          lib
-        (if (file-exists-p main)
-            main
-          (error "Could not find crate root file"))))))
+    (if (not root)
+        (progn
+          (message "Not in a crate, using current file as root")
+          (buffer-file-name))
+      (let ((lib (f-join root "src/lib.rs"))
+            (main (f-join root "src/main.rs")))
+        (if (file-exists-p lib)
+            lib
+          (if (file-exists-p main)
+              main
+            (error "Could not find crate root file")))))))
 
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
