@@ -89,6 +89,8 @@ that has had `cargo xtask dist && gunzip
   (highlight-regexp "\\_<exec\\_>" font-lock-keyword-face)
   (highlight-regexp "\\_<open\\_>" font-lock-keyword-face)
   (highlight-regexp "\\_<closed\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<reveal\\_>" font-lock-keyword-face)
+  (highlight-regexp "\\_<reveal_with_fuel\\_>" font-lock-keyword-face)
   (highlight-regexp "\\_<decreases\\_>" font-lock-keyword-face)
   (highlight-regexp "\\_<int\\_>" font-lock-keyword-face)
   (highlight-regexp "\\_<nat\\_>" font-lock-keyword-face))
