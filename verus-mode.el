@@ -71,6 +71,7 @@ that has had `cargo xtask dist && gunzip
 (defvar verus-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c C-c") 'verus-run-on-file)
+    (define-key map (kbd "C-c C-c C-p") 'verus-run-on-file-with-profiling)
     (define-key map (kbd "C-c C-c C-S-c") 'verus-run-on-crate)
     map))
 
@@ -247,10 +248,12 @@ If PREFIX is non-nil, then run ask for the command to run."
                        compilation-command
                      (read-shell-command "Run Verus: " compilation-command))))))))
 
-(defun verus-run-on-file (prefix)
+(defun verus-run-on-file (prefix &optional extra-args)
   "Run Verus on the current file.
 
-If PREFIX is non-nil, then run ask for the command to run."
+If PREFIX is non-nil, then run ask for the command to run.
+
+If EXTRA-ARGS is non-nil, then add them to the command."
   (interactive "p")
   (let ((file (buffer-file-name)))
     (if (not file)
@@ -262,10 +265,22 @@ If PREFIX is non-nil, then run ask for the command to run."
                        (shell-quote-argument (verus--crate-root-file))
                        (if (string= (verus--crate-root-file) file)
                            " --verify-root"
-                         (concat " --verify-module " (shell-quote-argument (f-base file)))))))
+                         (concat " --verify-module " (shell-quote-argument (f-base file))))
+                       (if extra-args
+                           (concat " " extra-args)
+                         ""))))
           (compile (if (= prefix 1)
                        compilation-command
                      (read-string "Run Verus: " compilation-command))))))))
+
+(defun verus-run-on-file-with-profiling (prefix)
+  "Run Verus on the current file, with profiling enabled.
+
+If PREFIX is non-nil, then enable 'always profiling' mode."
+  (interactive "p")
+  (verus-run-on-file 1 (if (= prefix 1)
+                           "--profile"
+                         "--profile-all")))
 
 (provide 'verus-mode)
 ;;; verus-mode.el ends here
