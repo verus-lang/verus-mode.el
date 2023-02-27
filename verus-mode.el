@@ -5,7 +5,7 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.1
+;; Version: 0.1.0
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0"))
 ;; Keywords: convenience, languages
 
@@ -159,7 +159,8 @@ that has had `cargo xtask dist && gunzip
   (setq-local rustic-format-on-save nil)
   (verus--syntax-highlight)
   (verus--compilation-mode-setup)
-  (verus--prettify-symbols-setup))
+  (verus--prettify-symbols-setup)
+  (verus--setup-version-check))
 
 (defun verus--cleanup ()
   "Cleanup Verus mode."
@@ -281,6 +282,64 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
   (verus-run-on-file 1 (if (= prefix 1)
                            "--profile"
                          "--profile-all")))
+
+;;; Automatic version checking
+
+(defun verus--verus-mode-el-current-version ()
+  "Get the current version of verus-mode.el."
+  (let ((version (with-temp-buffer
+                   (insert-file-contents-literally (locate-library "verus-mode.el"))
+                   (goto-char (point-min))
+                   (re-search-forward ";; Version: \\([0-9.]+\\)")
+                   (match-string 1))))
+    (if (not version)
+        (error "Could not find version in verus-mode.el")
+      version)))
+
+(defun verus--verus-mode-el-latest-available-version ()
+  "Get the latest available version for verus-mode.el."
+  (let ((version (with-temp-buffer
+                   ;; Insert "https://raw.githubusercontent.com/jaybosamiya/verus-mode.el/main/verus-mode.el" into the buffer
+                   ;; suppressing any messages.
+                   (let ((url-show-status nil))
+                     (url-insert-file-contents "https://raw.githubusercontent.com/jaybosamiya/verus-mode.el/main/verus-mode.el"))
+                   (goto-char (point-min))
+                   (re-search-forward ";; Version: \\([0-9.]+\\)")
+                   (match-string 1))))
+    (if (not version)
+        (error "Could not find version in verus-mode.el")
+      version)))
+
+(defvar verus-auto-check-version t
+  "If non-nil, automatically check for a new version of verus-mode.el, once per Emacs session.")
+
+(defvar verus--verus-mode-el-last-version-check nil
+  "The last time we checked for a new version of verus-mode.el.")
+
+(defvar verus--verus-mode-el-last-version-check-file
+  (f-join user-emacs-directory ".verus-mode.el-last-version-check")
+  "The file where we store the last time we checked for a new version of verus-mode.el.")
+
+(defun verus--verus-mode-el-check-version ()
+  "Check for a new version of verus-mode.el."
+  (when (and verus-auto-check-version
+             (or (not verus--verus-mode-el-last-version-check)
+                 (> (- (float-time) verus--verus-mode-el-last-version-check) (* 60 60 24))))
+    (let ((current (verus--verus-mode-el-current-version))
+          (latest (verus--verus-mode-el-latest-available-version)))
+      (when (version< current latest)
+        (message "verus-mode.el: A new version is available: %s (you are using %s)" latest current)))
+    (setq verus--verus-mode-el-last-version-check (float-time))
+    (with-temp-file verus--verus-mode-el-last-version-check-file
+      (insert (number-to-string verus--verus-mode-el-last-version-check)))))
+
+(defun verus--setup-version-check ()
+  "Setup the version check, delayed until Emacs is idle for 5 seconds."
+  (when (file-exists-p verus--verus-mode-el-last-version-check-file)
+    (with-temp-buffer
+      (insert-file-contents verus--verus-mode-el-last-version-check-file)
+      (setq verus--verus-mode-el-last-version-check (read (current-buffer)))))
+  (run-with-idle-timer 5 nil #'verus--verus-mode-el-check-version))
 
 (provide 'verus-mode)
 ;;; verus-mode.el ends here
