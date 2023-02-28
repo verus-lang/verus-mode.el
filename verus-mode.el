@@ -334,8 +334,9 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
   (interactive)
   (let ((current (verus--verus-mode-el-current-version))
         (latest (verus--verus-mode-el-latest-available-version)))
-    (when (version< current latest)
-      (message "verus-mode.el: A new version is available: %s (you are using %s)" latest current)))
+    (if (version< current latest)
+        (message "verus-mode.el: A new version is available: %s (you are using %s)" latest current)
+      (message "verus-mode.el: You are using the latest version (%s)" current)))
   (setq verus--verus-mode-el-last-version-check (float-time))
   (with-temp-file verus--verus-mode-el-last-version-check-file
     (insert (number-to-string verus--verus-mode-el-last-version-check))))
@@ -346,7 +347,9 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
             (> (- (float-time) verus--verus-mode-el-last-version-check)
                verus-auto-check-version-interval))
     (if verus-auto-check-version
-        (verus-check-version-now)
+        (progn
+          (message "verus-mode.el: Checking for a new version...")
+          (verus-check-version-now))
       (message (concat
                 "verus-mode.el: "
                 "Automatic version checking is disabled, but strongly recommended. "
