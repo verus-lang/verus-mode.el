@@ -19,7 +19,7 @@
 ;; This file implements support for Verus programming in Emacs, including:
 ;;
 ;; * Invoking Verus verification
-;; * TODO Syntax highlighting
+;; * Syntax highlighting
 ;; * Unicode math (prettify-symbols-mode)
 ;; * TODO Relative indentation
 ;; * TODO Real-time verification (Flycheck)
