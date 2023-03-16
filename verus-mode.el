@@ -5,8 +5,8 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.1.0
-;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0"))
+;; Version: 0.2.0
+;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0"))
 ;; Keywords: convenience, languages
 
 ;; This file is not part of GNU Emacs.
@@ -22,7 +22,7 @@
 ;; * Syntax highlighting
 ;; * Unicode math (prettify-symbols-mode)
 ;; * TODO Relative indentation
-;; * TODO Real-time verification (Flycheck)
+;; * Real-time verification (Flycheck)
 
 ;; Note: Byte-compilation is temporarily disabled on this package, to make it
 ;; easier to develop verus-mode. It will be re-enabled at some point.
@@ -34,6 +34,7 @@
 
 (require 'rustic)
 (require 'f)
+(require 'flycheck)
 
 ;;; Customization
 
@@ -172,7 +173,8 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   (verus--syntax-highlight)
   (verus--compilation-mode-setup)
   (verus--prettify-symbols-setup)
-  (verus--setup-version-check))
+  (verus--setup-version-check)
+  (verus--flycheck-setup))
 
 (defun verus--cleanup ()
   "Cleanup Verus mode."
@@ -229,12 +231,17 @@ curly brace"
 
 ;;; Commands
 
+(defvar-local verus--reported-non-crate-file nil
+  "Whether we have already reported that the current file is not a crate.")
+
 (defun verus--crate-root-file ()
   "Find the root of the current crate. Usually either `main.rs' or `lib.rs'."
   (let ((root (locate-dominating-file default-directory "Cargo.toml")))
     (if (not root)
         (progn
-          (message "Not in a crate, using current file as root")
+          (when (not verus--reported-non-crate-file)
+            (message "Not in a crate, using current file as root")
+            (setq-local verus--reported-non-crate-file t))
           (buffer-file-name))
       (let ((lib (f-join root "src/lib.rs"))
             (main (f-join root "src/main.rs")))
@@ -261,6 +268,24 @@ If PREFIX is non-nil, then run ask for the command to run."
                        compilation-command
                      (read-shell-command "Run Verus: " compilation-command))))))))
 
+(defun verus--run-on-file-command (&optional extra-args)
+  "Return the command to run Verus on the current file.
+
+If EXTRA-ARGS is non-nil, then add them to the command."
+  (let ((file (buffer-file-name)))
+    (if (not file)
+        (error "Buffer is not visiting a file---cannot run Verus")
+      (let ((default-directory (f-dirname file)))
+        (concat (shell-quote-argument verus--rust-verify)
+                " "
+                (shell-quote-argument (verus--crate-root-file))
+                (if (string= (verus--crate-root-file) file)
+                    " --verify-root"
+                  (concat " --verify-module " (shell-quote-argument (f-base file))))
+                (if extra-args
+                    (concat " " extra-args)
+                  ""))))))
+
 (defun verus-run-on-file (prefix &optional extra-args)
   "Run Verus on the current file.
 
@@ -268,23 +293,10 @@ If PREFIX is non-nil, then run ask for the command to run.
 
 If EXTRA-ARGS is non-nil, then add them to the command."
   (interactive "p")
-  (let ((file (buffer-file-name)))
-    (if (not file)
-        (message "Buffer is not visiting a file. Cannot run Verus.")
-      (let ((default-directory (f-dirname file)))
-        (let ((compilation-command
-               (concat (shell-quote-argument verus--rust-verify)
-                       " "
-                       (shell-quote-argument (verus--crate-root-file))
-                       (if (string= (verus--crate-root-file) file)
-                           " --verify-root"
-                         (concat " --verify-module " (shell-quote-argument (f-base file))))
-                       (if extra-args
-                           (concat " " extra-args)
-                         ""))))
-          (compile (if (= prefix 1)
-                       compilation-command
-                     (read-string "Run Verus: " compilation-command))))))))
+  (let ((compilation-command (verus--run-on-file-command extra-args)))
+    (compile (if (= prefix 1)
+                 compilation-command
+               (read-shell-command "Run Verus: " compilation-command)))))
 
 (defun verus-run-on-file-with-profiling (prefix)
   "Run Verus on the current file, with profiling enabled.
@@ -294,6 +306,32 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
   (verus-run-on-file 1 (if (= prefix 1)
                            "--profile"
                          "--profile-all")))
+
+;;; Flycheck setup
+
+(flycheck-define-checker verus
+  "A Verus syntax checker using the Verus compiler."
+  :command ("rust-verify.sh"
+            (eval (verus--crate-root-file))
+            (eval (if (string= (verus--crate-root-file) (buffer-file-name))
+                      (list "--verify-root")
+                    (list "--verify-module" (f-base (buffer-file-name)))))
+            "--error-format=short"
+            "--expand-errors"
+            "--rlimit=3")
+  :error-patterns
+  ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message))
+   (error (file-name) ":" line ":" column ": error: " (message)))
+  :predicate (lambda ()
+               (and
+                (flycheck-buffer-saved-p)
+                (verus--is-verus-file)))
+  :modes verus-mode)
+
+(defun verus--flycheck-setup ()
+  "Setup Flycheck for Verus."
+  (setq flycheck-verus-executable verus--rust-verify)
+  (add-to-list 'flycheck-checkers 'verus))
 
 ;;; Automatic version checking
 
