@@ -42,8 +42,6 @@ Clone this repository and add the following to your `~/.emacs`:
 
 ; Path to where you've cloned https://github.com/verus-lang/verus
 (setq verus-home "PATH_TO_VERUS_DIR")
-; Path to where you've cloned https://github.com/verus-lang/rust-analyzer
-(setq verus-analyzer "PATH_TO_VERUS_ANALYZER"))
 ```
 
 ### Doom Emacs
@@ -62,8 +60,6 @@ and the following to your `~/.doom.d/config.el`:
   :init
   ; Path to where you've cloned https://github.com/verus-lang/verus
   (setq verus-home "PATH_TO_VERUS_DIR")
-  ; Path to where you've cloned https://github.com/verus-lang/rust-analyzer
-  (setq verus-analyzer "PATH_TO_VERUS_ANALYZER"))
 ```
 
 ## Contributing
