@@ -79,6 +79,9 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   :group 'verus
   :type 'integer)
 
+(defcustom verus-enable-experimental-features nil
+  "If non-nil, enable experimental features. These features are not guaranteed to work, and may change or be removed at any time.")
+
 ;;; Keymaps
 
 (defvar verus-mode-map
@@ -159,15 +162,18 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   (if (or (not verus-home) (not (file-exists-p verus-home)))
       (error "Verus home directory %s does not exist" verus-home))
   (setq verus--rust-verify (f-join verus-home verus-verify-location))
-  (if (not verus-analyzer)
-      (message "The variable verus-analyzer must be set to properly use Verus mode.")
-    ;; FIXME: Use the right LSP server based on machine, currently this is
-    ;; hardcoded to macOS.
-    (let ((analyzer (concat verus-analyzer "/dist/rust-analyzer-x86_64-apple-darwin")))
-      (if (not (file-exists-p analyzer))
-          (message "The file %s does not exist.  Are you sure you ran 'cargo xtask dist' etc. in the correct path?" analyzer)
-        (setq-local rustic-lsp-server 'rust-analyzer)
-        (setq-local rustic-analyzer-command analyzer))))
+  (when verus-enable-experimental-features
+    ;; NOTE: This is marked as experimental because it doesn't work properly,
+    ;; should be fixed in the future, and stabilized.
+    (if (not verus-analyzer)
+        (message "The variable verus-analyzer must be set to properly use Verus mode.")
+      ;; FIXME: Use the right LSP server based on machine, currently this is
+      ;; hardcoded to macOS.
+      (let ((analyzer (concat verus-analyzer "/dist/rust-analyzer-x86_64-apple-darwin")))
+        (if (not (file-exists-p analyzer))
+            (message "The file %s does not exist.  Are you sure you ran 'cargo xtask dist' etc. in the correct path?" analyzer)
+          (setq-local rustic-lsp-server 'rust-analyzer)
+          (setq-local rustic-analyzer-command analyzer)))))
   ;; TEMPORARY FIXME: Disable format-on-save until we have verusfmt
   (setq-local rustic-format-on-save nil)
   (verus--syntax-highlight)
