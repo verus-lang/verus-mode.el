@@ -206,6 +206,19 @@ curly brace"
     (goto-char (point-min))
     (re-search-forward "^verus! *{$" nil t)))
 
+(defun verus--is-main-file ()
+  "Return non-nil if the current buffer is a Verus main file.
+This is done by checking if the file contains a `fn main` function."
+  (save-excursion
+    (goto-char (point-min))
+    (re-search-forward "[ \t]*fn[ \t]+main[ \t]*(" nil t)))
+
+(defun verus--has-modules-in-file ()
+  "Return non-nil if the current buffer has modules in it."
+  (save-excursion
+    (goto-char (point-min))
+    (re-search-forward "[ \t]*mod[ \t]+" nil t)))
+
 (defun verus--verus-mode-or-rust-mode ()
   "Decide whether to use Verus mode or Rust mode."
   (if (verus--is-verus-file)
@@ -242,20 +255,24 @@ curly brace"
 
 (defun verus--crate-root-file ()
   "Find the root of the current crate. Usually either `main.rs' or `lib.rs'."
-  (let ((root (locate-dominating-file default-directory "Cargo.toml")))
-    (if (not root)
-        (progn
-          (when (not verus--reported-non-crate-file)
-            (message "Not in a crate, using current file as root")
-            (setq-local verus--reported-non-crate-file t))
-          (buffer-file-name))
-      (let ((lib (f-join root "src/lib.rs"))
-            (main (f-join root "src/main.rs")))
-        (if (file-exists-p lib)
-            lib
-          (if (file-exists-p main)
-              main
-            (error "Could not find crate root file")))))))
+  (let ((root (locate-dominating-file default-directory "Cargo.toml"))
+        (is-main (verus--is-main-file)))
+    (if is-main
+        (buffer-file-name)
+      (if (not root)
+          (progn
+            (when (not verus--reported-non-crate-file)
+              (if (not is-main)
+                  (message "Not in a crate, using current file as root"))
+              (setq-local verus--reported-non-crate-file t))
+            (buffer-file-name))
+        (let ((lib (f-join root "src/lib.rs"))
+              (main (f-join root "src/main.rs")))
+          (if (file-exists-p lib)
+              lib
+            (if (file-exists-p main)
+                main
+              (error "Could not find crate root file"))))))))
 
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
@@ -319,15 +336,27 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
   "A Verus syntax checker using the Verus compiler."
   :command ("rust-verify.sh"
             (eval (verus--crate-root-file))
-            (eval (if (string= (verus--crate-root-file) (buffer-file-name))
-                      (list "--verify-root")
-                    (list "--verify-module" (f-base (buffer-file-name)))))
+            (eval
+             (if (verus--has-modules-in-file)
+                 ;; If there are modules in the current file, we just run on the
+                 ;; whole crate, rather than picking a specific module.
+                 ;;
+                 ;; TODO: Once Verus supports "modules here and below" type of
+                 ;; option, we can use that instead to speed things up. See
+                 ;; https://github.com/verus-lang/verus/discussions/385
+                 (list)
+               (if (string= (verus--crate-root-file) (buffer-file-name))
+                   (list "--verify-root")
+                 (list "--verify-module" (f-base (buffer-file-name))))))
             "--error-format=short"
             "--expand-errors"
             "--rlimit=3")
   :error-patterns
-  ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message))
-   (error (file-name) ":" line ":" column ": error: " (message)))
+  ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
+   (error (file-name) ":" line ":" column ": error: " (message) line-end)
+   (warning (file-name) ":" line ":" column ": warning[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
+   (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
+   (info (file-name) ":" line ":" column ": note: " (message) line-end))
   :predicate (lambda ()
                (and
                 (flycheck-buffer-saved-p)
