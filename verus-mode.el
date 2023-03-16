@@ -5,8 +5,8 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.1.0
-;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0"))
+;; Version: 0.2.0
+;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0"))
 ;; Keywords: convenience, languages
 
 ;; This file is not part of GNU Emacs.
@@ -22,7 +22,7 @@
 ;; * Syntax highlighting
 ;; * Unicode math (prettify-symbols-mode)
 ;; * TODO Relative indentation
-;; * TODO Real-time verification (Flycheck)
+;; * Real-time verification (Flycheck)
 
 ;; Note: Byte-compilation is temporarily disabled on this package, to make it
 ;; easier to develop verus-mode. It will be re-enabled at some point.
@@ -34,6 +34,7 @@
 
 (require 'rustic)
 (require 'f)
+(require 'flycheck)
 
 ;;; Customization
 
@@ -77,6 +78,9 @@ that has had `cargo xtask dist && gunzip
 Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   :group 'verus
   :type 'integer)
+
+(defcustom verus-enable-experimental-features nil
+  "If non-nil, enable experimental features. These features are not guaranteed to work, and may change or be removed at any time.")
 
 ;;; Keymaps
 
@@ -158,21 +162,25 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   (if (or (not verus-home) (not (file-exists-p verus-home)))
       (error "Verus home directory %s does not exist" verus-home))
   (setq verus--rust-verify (f-join verus-home verus-verify-location))
-  (if (not verus-analyzer)
-      (message "The variable verus-analyzer must be set to properly use Verus mode.")
-    ;; FIXME: Use the right LSP server based on machine, currently this is
-    ;; hardcoded to macOS.
-    (let ((analyzer (concat verus-analyzer "/dist/rust-analyzer-x86_64-apple-darwin")))
-      (if (not (file-exists-p analyzer))
-          (message "The file %s does not exist.  Are you sure you ran 'cargo xtask dist' etc. in the correct path?" analyzer)
-        (setq-local rustic-lsp-server 'rust-analyzer)
-        (setq-local rustic-analyzer-command analyzer))))
+  (when verus-enable-experimental-features
+    ;; NOTE: This is marked as experimental because it doesn't work properly,
+    ;; should be fixed in the future, and stabilized.
+    (if (not verus-analyzer)
+        (message "The variable verus-analyzer must be set to properly use Verus mode.")
+      ;; FIXME: Use the right LSP server based on machine, currently this is
+      ;; hardcoded to macOS.
+      (let ((analyzer (concat verus-analyzer "/dist/rust-analyzer-x86_64-apple-darwin")))
+        (if (not (file-exists-p analyzer))
+            (message "The file %s does not exist.  Are you sure you ran 'cargo xtask dist' etc. in the correct path?" analyzer)
+          (setq-local rustic-lsp-server 'rust-analyzer)
+          (setq-local rustic-analyzer-command analyzer)))))
   ;; TEMPORARY FIXME: Disable format-on-save until we have verusfmt
   (setq-local rustic-format-on-save nil)
   (verus--syntax-highlight)
   (verus--compilation-mode-setup)
   (verus--prettify-symbols-setup)
-  (verus--setup-version-check))
+  (verus--setup-version-check)
+  (verus--flycheck-setup))
 
 (defun verus--cleanup ()
   "Cleanup Verus mode."
@@ -193,10 +201,28 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   "Return non-nil if the current buffer is a Verus file.
 This is done by checking if the file contains a string that is
 'verus!' followed by any number of spaces, and then an opening
-curly brace"
+curly brace.
+
+Alternatively, if the file has a 'test_verify_one_file!'
+similarly, then it belongs to the Verus test suite, and also
+counts as a Verus file."
   (save-excursion
     (goto-char (point-min))
-    (re-search-forward "^verus! *{$" nil t)))
+    (or (re-search-forward "^[ \t]*verus![ \t]*{" nil t)
+        (re-search-forward "^[ \t]*test_verify_one_file![ \t]*{" nil t))))
+
+(defun verus--is-main-file ()
+  "Return non-nil if the current buffer is a Verus main file.
+This is done by checking if the file contains a `fn main` function."
+  (save-excursion
+    (goto-char (point-min))
+    (re-search-forward "[ \t]*fn[ \t]+main[ \t]*(" nil t)))
+
+(defun verus--has-modules-in-file ()
+  "Return non-nil if the current buffer has modules in it."
+  (save-excursion
+    (goto-char (point-min))
+    (re-search-forward "[ \t]*mod[ \t]+" nil t)))
 
 (defun verus--verus-mode-or-rust-mode ()
   "Decide whether to use Verus mode or Rust mode."
@@ -229,20 +255,29 @@ curly brace"
 
 ;;; Commands
 
+(defvar-local verus--reported-non-crate-file nil
+  "Whether we have already reported that the current file is not a crate.")
+
 (defun verus--crate-root-file ()
   "Find the root of the current crate. Usually either `main.rs' or `lib.rs'."
-  (let ((root (locate-dominating-file default-directory "Cargo.toml")))
-    (if (not root)
-        (progn
-          (message "Not in a crate, using current file as root")
-          (buffer-file-name))
-      (let ((lib (f-join root "src/lib.rs"))
-            (main (f-join root "src/main.rs")))
-        (if (file-exists-p lib)
-            lib
-          (if (file-exists-p main)
-              main
-            (error "Could not find crate root file")))))))
+  (let ((root (locate-dominating-file default-directory "Cargo.toml"))
+        (is-main (verus--is-main-file)))
+    (if is-main
+        (buffer-file-name)
+      (if (not root)
+          (progn
+            (when (not verus--reported-non-crate-file)
+              (if (not is-main)
+                  (message "Not in a crate, using current file as root"))
+              (setq-local verus--reported-non-crate-file t))
+            (buffer-file-name))
+        (let ((lib (f-join root "src/lib.rs"))
+              (main (f-join root "src/main.rs")))
+          (if (file-exists-p lib)
+              lib
+            (if (file-exists-p main)
+                main
+              (error "Could not find crate root file"))))))))
 
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
@@ -261,6 +296,36 @@ If PREFIX is non-nil, then run ask for the command to run."
                        compilation-command
                      (read-shell-command "Run Verus: " compilation-command))))))))
 
+(defun verus--run-on-file-command (&optional extra-args)
+  "Return the command to run Verus on the current file.
+
+If EXTRA-ARGS is non-nil, then add them to the command."
+  (let ((file (buffer-file-name)))
+    (if (not file)
+        (error "Buffer is not visiting a file---cannot run Verus")
+      (let ((default-directory (f-dirname file)))
+        (concat (shell-quote-argument verus--rust-verify)
+                " "
+                (shell-quote-argument (verus--crate-root-file))
+                (if (verus--has-modules-in-file)
+                    ;; If there are modules in the current file, we just run on the
+                    ;; whole crate, rather than picking a specific module.
+                    ;;
+                    ;; TODO: Once Verus supports "modules here and below" type of
+                    ;; option, we can use that instead to speed things up. See
+                    ;; https://github.com/verus-lang/verus/discussions/385
+                    (progn
+                      (message
+                       (concat "File has modules, running on whole crate. "
+                               "Verus#385, once implemented, should support convenient submodules."))
+                      "")
+                  (if (string= (verus--crate-root-file) file)
+                      " --verify-root"
+                    (concat " --verify-module " (shell-quote-argument (f-base file)))))
+                (if extra-args
+                    (concat " " extra-args)
+                  ""))))))
+
 (defun verus-run-on-file (prefix &optional extra-args)
   "Run Verus on the current file.
 
@@ -268,23 +333,10 @@ If PREFIX is non-nil, then run ask for the command to run.
 
 If EXTRA-ARGS is non-nil, then add them to the command."
   (interactive "p")
-  (let ((file (buffer-file-name)))
-    (if (not file)
-        (message "Buffer is not visiting a file. Cannot run Verus.")
-      (let ((default-directory (f-dirname file)))
-        (let ((compilation-command
-               (concat (shell-quote-argument verus--rust-verify)
-                       " "
-                       (shell-quote-argument (verus--crate-root-file))
-                       (if (string= (verus--crate-root-file) file)
-                           " --verify-root"
-                         (concat " --verify-module " (shell-quote-argument (f-base file))))
-                       (if extra-args
-                           (concat " " extra-args)
-                         ""))))
-          (compile (if (= prefix 1)
-                       compilation-command
-                     (read-string "Run Verus: " compilation-command))))))))
+  (let ((compilation-command (verus--run-on-file-command extra-args)))
+    (compile (if (= prefix 1)
+                 compilation-command
+               (read-shell-command "Run Verus: " compilation-command)))))
 
 (defun verus-run-on-file-with-profiling (prefix)
   "Run Verus on the current file, with profiling enabled.
@@ -294,6 +346,44 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
   (verus-run-on-file 1 (if (= prefix 1)
                            "--profile"
                          "--profile-all")))
+
+;;; Flycheck setup
+
+(flycheck-define-checker verus
+  "A Verus syntax checker using the Verus compiler."
+  :command ("rust-verify.sh"
+            (eval (verus--crate-root-file))
+            (eval
+             (if (verus--has-modules-in-file)
+                 ;; If there are modules in the current file, we just run on the
+                 ;; whole crate, rather than picking a specific module.
+                 ;;
+                 ;; TODO: Once Verus supports "modules here and below" type of
+                 ;; option, we can use that instead to speed things up. See
+                 ;; https://github.com/verus-lang/verus/discussions/385
+                 (list)
+               (if (string= (verus--crate-root-file) (buffer-file-name))
+                   (list "--verify-root")
+                 (list "--verify-module" (f-base (buffer-file-name))))))
+            "--error-format=short"
+            "--expand-errors"
+            "--rlimit=3")
+  :error-patterns
+  ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
+   (error (file-name) ":" line ":" column ": error: " (message) line-end)
+   (warning (file-name) ":" line ":" column ": warning[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
+   (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
+   (info (file-name) ":" line ":" column ": note: " (message) line-end))
+  :predicate (lambda ()
+               (and
+                (flycheck-buffer-saved-p)
+                (verus--is-verus-file)))
+  :modes verus-mode)
+
+(defun verus--flycheck-setup ()
+  "Setup Flycheck for Verus."
+  (setq flycheck-verus-executable verus--rust-verify)
+  (add-to-list 'flycheck-checkers 'verus))
 
 ;;; Automatic version checking
 
@@ -334,8 +424,9 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
   (interactive)
   (let ((current (verus--verus-mode-el-current-version))
         (latest (verus--verus-mode-el-latest-available-version)))
-    (when (version< current latest)
-      (message "verus-mode.el: A new version is available: %s (you are using %s)" latest current)))
+    (if (version< current latest)
+        (message "verus-mode.el: A new version is available: %s (you are using %s)" latest current)
+      (message "verus-mode.el: You are using the latest version (%s)" current)))
   (setq verus--verus-mode-el-last-version-check (float-time))
   (with-temp-file verus--verus-mode-el-last-version-check-file
     (insert (number-to-string verus--verus-mode-el-last-version-check))))
@@ -346,7 +437,9 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
             (> (- (float-time) verus--verus-mode-el-last-version-check)
                verus-auto-check-version-interval))
     (if verus-auto-check-version
-        (verus-check-version-now)
+        (progn
+          (message "verus-mode.el: Checking for a new version...")
+          (verus-check-version-now))
       (message (concat
                 "verus-mode.el: "
                 "Automatic version checking is disabled, but strongly recommended. "
