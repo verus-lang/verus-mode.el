@@ -6,6 +6,7 @@ An Emacs mode for [Verus](https://github.com/verus-lang/verus).
 
 + Invoking Verus on current file or project (see [keybindings](#keybindings)),
   with support for jumping to errors (via `compilation-mode`).
++ Real-time verification (via `flycheck`).
 + Syntax highlighting (improved Verus-specific highlighting on top of `rustic-mode`).
 + Unicode math support (via prettify-symbols-mode)
 + Automagic detection of Verus files (via a `verus!` regex search), to enable
