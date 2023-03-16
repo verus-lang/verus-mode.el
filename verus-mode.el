@@ -302,9 +302,21 @@ If EXTRA-ARGS is non-nil, then add them to the command."
         (concat (shell-quote-argument verus--rust-verify)
                 " "
                 (shell-quote-argument (verus--crate-root-file))
-                (if (string= (verus--crate-root-file) file)
-                    " --verify-root"
-                  (concat " --verify-module " (shell-quote-argument (f-base file))))
+                (if (verus--has-modules-in-file)
+                    ;; If there are modules in the current file, we just run on the
+                    ;; whole crate, rather than picking a specific module.
+                    ;;
+                    ;; TODO: Once Verus supports "modules here and below" type of
+                    ;; option, we can use that instead to speed things up. See
+                    ;; https://github.com/verus-lang/verus/discussions/385
+                    (progn
+                      (message
+                       (concat "File has modules, running on whole crate. "
+                               "Verus#385, once implemented, should support convenient submodules."))
+                      "")
+                  (if (string= (verus--crate-root-file) file)
+                      " --verify-root"
+                    (concat " --verify-module " (shell-quote-argument (f-base file)))))
                 (if extra-args
                     (concat " " extra-args)
                   ""))))))
