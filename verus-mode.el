@@ -201,10 +201,15 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   "Return non-nil if the current buffer is a Verus file.
 This is done by checking if the file contains a string that is
 'verus!' followed by any number of spaces, and then an opening
-curly brace"
+curly brace.
+
+Alternatively, if the file has a 'test_verify_one_file!'
+similarly, then it belongs to the Verus test suite, and also
+counts as a Verus file."
   (save-excursion
     (goto-char (point-min))
-    (re-search-forward "^verus! *{$" nil t)))
+    (or (re-search-forward "^[ \t]*verus![ \t]*{" nil t)
+        (re-search-forward "^[ \t]*test_verify_one_file![ \t]*{" nil t))))
 
 (defun verus--is-main-file ()
   "Return non-nil if the current buffer is a Verus main file.
