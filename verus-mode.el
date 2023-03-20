@@ -5,7 +5,7 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.2.0
+;; Version: 0.2.1
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0"))
 ;; Keywords: convenience, languages
 
@@ -287,11 +287,15 @@ If PREFIX is non-nil, then run ask for the command to run."
   (let ((file (buffer-file-name)))
     (if (not file)
         (message "Buffer is not visiting a file. Cannot run Verus.")
-      (let ((default-directory (f-dirname file)))
+      (let ((default-directory (f-dirname file))
+            (crate-root (verus--crate-root-file)))
         (let ((compilation-command
                (concat (shell-quote-argument verus--rust-verify)
                        " "
-                       (shell-quote-argument (verus--crate-root-file)))))
+                       (if (string-suffix-p "lib.rs" crate-root)
+                           "--crate-type=lib "
+                         "")
+                       (shell-quote-argument crate-root))))
           (compile (if (= prefix 1)
                        compilation-command
                      (read-shell-command "Run Verus: " compilation-command))))))))
@@ -303,9 +307,13 @@ If EXTRA-ARGS is non-nil, then add them to the command."
   (let ((file (buffer-file-name)))
     (if (not file)
         (error "Buffer is not visiting a file---cannot run Verus")
-      (let ((default-directory (f-dirname file)))
+      (let ((default-directory (f-dirname file))
+            (crate-root (verus--crate-root-file)))
         (concat (shell-quote-argument verus--rust-verify)
                 " "
+                (if (string-suffix-p "lib.rs" crate-root)
+                    "--crate-type=lib "
+                  "")
                 (shell-quote-argument (verus--crate-root-file))
                 (if (verus--has-modules-in-file)
                     ;; If there are modules in the current file, we just run on the
@@ -319,7 +327,7 @@ If EXTRA-ARGS is non-nil, then add them to the command."
                        (concat "File has modules, running on whole crate. "
                                "Verus#385, once implemented, should support convenient submodules."))
                       "")
-                  (if (string= (verus--crate-root-file) file)
+                  (if (string= crate-root file)
                       " --verify-root"
                     (concat " --verify-module " (shell-quote-argument (f-base file)))))
                 (if extra-args
@@ -353,6 +361,10 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
   "A Verus syntax checker using the Verus compiler."
   :command ("rust-verify.sh"
             (eval (verus--crate-root-file))
+            (eval
+             (if (string-suffix-p "lib.rs" (verus--crate-root-file))
+                 (list "--crate-type=lib")
+               (list)))
             (eval
              (if (verus--has-modules-in-file)
                  ;; If there are modules in the current file, we just run on the
