@@ -279,60 +279,53 @@ This is done by checking if the file contains a `fn main` function."
                 main
               (error "Could not find crate root file"))))))))
 
+(defun verus--run-on-crate-command ()
+  "Return the command to run Verus on the current crate.
+
+Returns a list of command-line arguments. Expects to be run in a
+buffer visiting the file, otherwise throws an error."
+  (let ((file (buffer-file-name)))
+    (when (not file)
+      (error "Buffer is not visiting a file. Cannot run Verus"))
+    (let ((default-directory (f-dirname file))
+          (crate-root (verus--crate-root-file)))
+      (append
+       (list verus--rust-verify)
+       (if (string-suffix-p "lib.rs" crate-root)
+           (list "--crate-type=lib"))
+       (list crate-root)))))
+
+(defun verus--run-on-file-command ()
+  "Return the command to run Verus on the current file.
+
+Returns a list of command-line arguments. Expects to be run in a
+buffer visiting the file, otherwise throws an error."
+  (append
+   (verus--run-on-crate-command)
+   (cond
+    ((verus--has-modules-in-file)
+     (message
+      (concat "File has modules, running on whole crate. "
+              "Verus#385, once implemented, should support convenient submodules."))
+     nil)
+    ((string= (buffer-file-name) (verus--crate-root-file))
+     (list "--verify-root"))
+    (t
+     (list "--verify-module" (f-base (buffer-file-name)))))))
+
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
 
 If PREFIX is non-nil, then run ask for the command to run."
   (interactive "p")
-  (let ((file (buffer-file-name)))
-    (if (not file)
-        (message "Buffer is not visiting a file. Cannot run Verus.")
-      (let ((default-directory (f-dirname file))
-            (crate-root (verus--crate-root-file)))
-        (let ((compilation-command
-               (concat (shell-quote-argument verus--rust-verify)
-                       " "
-                       (if (string-suffix-p "lib.rs" crate-root)
-                           "--crate-type=lib "
-                         "")
-                       (shell-quote-argument crate-root))))
-          (compile (if (= prefix 1)
-                       compilation-command
-                     (read-shell-command "Run Verus: " compilation-command))))))))
-
-(defun verus--run-on-file-command (&optional extra-args)
-  "Return the command to run Verus on the current file.
-
-If EXTRA-ARGS is non-nil, then add them to the command."
-  (let ((file (buffer-file-name)))
-    (if (not file)
-        (error "Buffer is not visiting a file---cannot run Verus")
-      (let ((default-directory (f-dirname file))
-            (crate-root (verus--crate-root-file)))
-        (concat (shell-quote-argument verus--rust-verify)
-                " "
-                (if (string-suffix-p "lib.rs" crate-root)
-                    "--crate-type=lib "
-                  "")
-                (shell-quote-argument (verus--crate-root-file))
-                (if (verus--has-modules-in-file)
-                    ;; If there are modules in the current file, we just run on the
-                    ;; whole crate, rather than picking a specific module.
-                    ;;
-                    ;; TODO: Once Verus supports "modules here and below" type of
-                    ;; option, we can use that instead to speed things up. See
-                    ;; https://github.com/verus-lang/verus/discussions/385
-                    (progn
-                      (message
-                       (concat "File has modules, running on whole crate. "
-                               "Verus#385, once implemented, should support convenient submodules."))
-                      "")
-                  (if (string= crate-root file)
-                      " --verify-root"
-                    (concat " --verify-module " (shell-quote-argument (f-base file)))))
-                (if extra-args
-                    (concat " " extra-args)
-                  ""))))))
+  (let ((verus-command (with-demoted-errors "Verus error: %S"
+                         (verus--run-on-crate-command))))
+    (when verus-command
+      (let ((compilation-command
+             (mapconcat #'shell-quote-argument verus-command " ")))
+        (compile (if (= prefix 1)
+                     compilation-command
+                   (read-shell-command "Run Verus: " compilation-command)))))))
 
 (defun verus-run-on-file (prefix &optional extra-args)
   "Run Verus on the current file.
@@ -341,10 +334,16 @@ If PREFIX is non-nil, then run ask for the command to run.
 
 If EXTRA-ARGS is non-nil, then add them to the command."
   (interactive "p")
-  (let ((compilation-command (verus--run-on-file-command extra-args)))
-    (compile (if (= prefix 1)
-                 compilation-command
-               (read-shell-command "Run Verus: " compilation-command)))))
+  (let ((verus-command (with-demoted-errors "Verus error: %S"
+                         (verus--run-on-file-command))))
+    (when verus-command
+      (let ((compilation-command
+             (mapconcat #'shell-quote-argument
+                        (append verus-command extra-args)
+                        " ")))
+        (compile (if (= prefix 1)
+                     compilation-command
+                   (read-shell-command "Run Verus: " compilation-command)))))))
 
 (defun verus-run-on-file-with-profiling (prefix)
   "Run Verus on the current file, with profiling enabled.
@@ -360,23 +359,7 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
 (flycheck-define-checker verus
   "A Verus syntax checker using the Verus compiler."
   :command ("rust-verify.sh"
-            (eval (verus--crate-root-file))
-            (eval
-             (if (string-suffix-p "lib.rs" (verus--crate-root-file))
-                 (list "--crate-type=lib")
-               (list)))
-            (eval
-             (if (verus--has-modules-in-file)
-                 ;; If there are modules in the current file, we just run on the
-                 ;; whole crate, rather than picking a specific module.
-                 ;;
-                 ;; TODO: Once Verus supports "modules here and below" type of
-                 ;; option, we can use that instead to speed things up. See
-                 ;; https://github.com/verus-lang/verus/discussions/385
-                 (list)
-               (if (string= (verus--crate-root-file) (buffer-file-name))
-                   (list "--verify-root")
-                 (list "--verify-module" (f-base (buffer-file-name))))))
+            (eval (cdr (verus--run-on-file-command)))
             "--error-format=short"
             "--expand-errors"
             "--rlimit=3")
