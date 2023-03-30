@@ -28,6 +28,17 @@ The above keybindings are only active when the current buffer is a Verus file.
 If a file is not detected as a Verus file, you can manually enable Verus-mode
 with `M-x verus-mode`.
 
+## Extra Arguments Support
+
+To pass extra arguments to Verus, either use `C-u` before using any of the above
+"Run Verus" commands, or add a new table to the `Cargo.toml` for your Verus
+project to have it automatically picked up:
+
+``` toml
+[package.metadata.verus]
+extra_args = "......"
+```
+
 ## Install
 
 ### Vanilla Emacs
