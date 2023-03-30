@@ -1,11 +1,11 @@
-;;; verus-mode --- Support for Verus programming -*- lexical-binding: t; indent-tabs-mode: nil; no-byte-compile: t; -*-
+;;; verus-mode.el --- Support for Verus programming -*- lexical-binding: t; indent-tabs-mode: nil; no-byte-compile: t; -*-
 
 ;; Copyright (C) 2023 Jay Bosamiya
 ;; Author: Jay Bosamiya <verus@jaybosamiya.com>
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.2.1
+;; Version: 0.2.2
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0"))
 ;; Keywords: convenience, languages
 
