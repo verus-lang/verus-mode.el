@@ -5,7 +5,7 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.2.3
+;; Version: 0.2.4
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0"))
 ;; Keywords: convenience, languages
 
@@ -284,34 +284,35 @@ This is done by checking if the file contains a `fn main` function."
 
 This reads the `extra_args` key from the `package.metadata.verus`
 table in the Cargo.toml for the current crate."
-  (let* ((root (locate-dominating-file default-directory "Cargo.toml"))
-         (toml (f-join root "Cargo.toml"))
-         ;; NOTE: This is a hack, we should use a TOML parser
-         ;; instead.
-         (verus-table
-          (with-temp-buffer
-            (insert-file-contents toml)
-            (let ((init (re-search-forward "^[ \t]*\\[package.metadata.verus\\][ \t]*$" nil t)))
-              (if (not init)
-                  nil
-                (let ((start (point)))
-                  (let ((end (re-search-forward "^[ \t]*\\[.*\\]$" nil t)))
-                    (if end
-                        (buffer-substring start (point))
-                      (buffer-substring start (point-max)))))))))
-         (extra-args
-          (when verus-table
-            (with-temp-buffer
-              (insert verus-table)
-              (goto-char (point-min))
-              (let ((start (re-search-forward "^[ \t]*extra_args[ \t]*=[ \t]*\"\\(.*\\)\"[ \t]*$" nil t)))
-                (if (not start)
-                    nil
-                  (let ((start (match-beginning 1))
-                        (end (match-end 1)))
-                    (buffer-substring start end))))))))
-    (when extra-args
-      (split-string-and-unquote (string-trim extra-args)))))
+  (let ((root (locate-dominating-file default-directory "Cargo.toml")))
+    (when root
+      (let* ((toml (f-join root "Cargo.toml"))
+             ;; NOTE: This is a hack, we should use a TOML parser
+             ;; instead.
+             (verus-table
+              (with-temp-buffer
+                (insert-file-contents toml)
+                (let ((init (re-search-forward "^[ \t]*\\[package.metadata.verus\\][ \t]*$" nil t)))
+                  (if (not init)
+                      nil
+                    (let ((start (point)))
+                      (let ((end (re-search-forward "^[ \t]*\\[.*\\]$" nil t)))
+                        (if end
+                            (buffer-substring start (point))
+                          (buffer-substring start (point-max)))))))))
+             (extra-args
+              (when verus-table
+                (with-temp-buffer
+                  (insert verus-table)
+                  (goto-char (point-min))
+                  (let ((start (re-search-forward "^[ \t]*extra_args[ \t]*=[ \t]*\"\\(.*\\)\"[ \t]*$" nil t)))
+                    (if (not start)
+                        nil
+                      (let ((start (match-beginning 1))
+                            (end (match-end 1)))
+                        (buffer-substring start end))))))))
+        (when extra-args
+          (split-string-and-unquote (string-trim extra-args)))))))
 
 (defun verus--run-on-crate-command ()
   "Return the command to run Verus on the current crate.
