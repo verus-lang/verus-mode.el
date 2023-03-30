@@ -5,7 +5,7 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.2.4
+;; Version: 0.2.5
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0"))
 ;; Keywords: convenience, languages
 
@@ -282,7 +282,7 @@ This is done by checking if the file contains a `fn main` function."
 (defun verus--extra-args-from-cargo-toml ()
   "Return a list of extra arguments to pass to Verus.
 
-This reads the `extra_args` key from the `package.metadata.verus`
+This reads the `extra_args` key from the `package.metadata.verus.ide`
 table in the Cargo.toml for the current crate."
   (let ((root (locate-dominating-file default-directory "Cargo.toml")))
     (when root
@@ -292,7 +292,7 @@ table in the Cargo.toml for the current crate."
              (verus-table
               (with-temp-buffer
                 (insert-file-contents toml)
-                (let ((init (re-search-forward "^[ \t]*\\[package.metadata.verus\\][ \t]*$" nil t)))
+                (let ((init (re-search-forward "^[ \t]*\\[package.metadata.verus.ide\\][ \t]*$" nil t)))
                   (if (not init)
                       nil
                     (let ((start (point)))

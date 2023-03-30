@@ -35,7 +35,7 @@ To pass extra arguments to Verus, either use `C-u` before using any of the above
 project to have it automatically picked up:
 
 ``` toml
-[package.metadata.verus]
+[package.metadata.verus.ide]
 extra_args = "......"
 ```
 
