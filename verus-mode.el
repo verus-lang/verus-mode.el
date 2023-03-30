@@ -279,6 +279,40 @@ This is done by checking if the file contains a `fn main` function."
                 main
               (error "Could not find crate root file"))))))))
 
+(defun verus--extra-args-from-cargo-toml ()
+  "Return a list of extra arguments to pass to Verus.
+
+This reads the `extra_args` key from the `package.metadata.verus`
+table in the Cargo.toml for the current crate."
+  (let* ((root (locate-dominating-file default-directory "Cargo.toml"))
+         (toml (f-join root "Cargo.toml"))
+         ;; NOTE: This is a hack, we should use a TOML parser
+         ;; instead.
+         (verus-table
+          (with-temp-buffer
+            (insert-file-contents toml)
+            (let ((init (re-search-forward "^[ \t]*\\[package.metadata.verus\\][ \t]*$" nil t)))
+              (if (not init)
+                  nil
+                (let ((start (point)))
+                  (let ((end (re-search-forward "^[ \t]*\\[.*\\]$" nil t)))
+                    (if end
+                        (buffer-substring start (point))
+                      (buffer-substring start (point-max)))))))))
+         (extra-args
+          (when verus-table
+            (with-temp-buffer
+              (insert verus-table)
+              (goto-char (point-min))
+              (let ((start (re-search-forward "^[ \t]*extra_args[ \t]*=[ \t]*\"\\(.*\\)\"[ \t]*$" nil t)))
+                (if (not start)
+                    nil
+                  (let ((start (match-beginning 1))
+                        (end (match-end 1)))
+                    (buffer-substring start end))))))))
+    (when extra-args
+      (split-string-and-unquote (string-trim extra-args)))))
+
 (defun verus--run-on-crate-command ()
   "Return the command to run Verus on the current crate.
 
@@ -293,6 +327,7 @@ buffer visiting the file, otherwise throws an error."
        (list verus--rust-verify)
        (if (string-suffix-p "lib.rs" crate-root)
            (list "--crate-type=lib"))
+       (verus--extra-args-from-cargo-toml)
        (list crate-root)))))
 
 (defun verus--run-on-file-command ()
