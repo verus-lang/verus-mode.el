@@ -5,7 +5,7 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.2.2
+;; Version: 0.2.3
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0"))
 ;; Keywords: convenience, languages
 
@@ -386,8 +386,8 @@ If EXTRA-ARGS is non-nil, then add them to the command."
 If PREFIX is non-nil, then enable 'always profiling' mode."
   (interactive "p")
   (verus-run-on-file 1 (if (= prefix 1)
-                           "--profile"
-                         "--profile-all")))
+                           (list "--profile")
+                         (list "--profile-all"))))
 
 ;;; Flycheck setup
 
