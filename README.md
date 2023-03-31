@@ -39,6 +39,25 @@ project to have it automatically picked up:
 extra_args = "......"
 ```
 
+## Real-time verification
+
+Since verus-mode uses flycheck (run upon every save), regular flycheck
+keybindings work too. For quick reference, some of the particularly useful ones
+are included here:
+
+| Keybinding | Description                          |
+|------------|--------------------------------------|
+| `C-c ! l`  | List all errors in a separate buffer |
+| `C-c ! n`  | Jump to next error                   |
+| `C-c ! p`  | Jump to previous error               |
+
+## Unicode Math Prettification
+
+Verus-mode displays keywords like `forall` and `exists` using mathematical
+symbols `∀` and `∃`. If you dislike this behavior, you can disable this by
+turning off `prettify-symbols-mode` (use `M-x prettify-symbols-mode` to toggle
+this in a single buffer).
+
 ## Install
 
 Your installation steps for using `verus-mode.el` may vary depending on how your
