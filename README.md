@@ -41,7 +41,10 @@ extra_args = "......"
 
 ## Install
 
-### Vanilla Emacs
+Your installation steps for using `verus-mode.el` may vary depending on how your
+personal Emacs is set up.
+
+### If you are using regular vanilla Emacs
 
 Clone this repository and add the following to your `~/.emacs`:
 
@@ -55,7 +58,31 @@ Clone this repository and add the following to your `~/.emacs`:
 (setq verus-home "PATH_TO_VERUS_DIR")
 ```
 
-### Doom Emacs
+`verus-mode.el` expects that you already have a working
+[rustic](https://github.com/brotzeit/rustic) setup and such; if you are starting
+_entirely_ from scratch with Emacs, then you may wish to include the following
+code in your `.emacs` file _before_ the above code to make sure you have all the
+pre-requisites:
+
+<details><summary>Click to expand</summary>
+
+``` emacs-lisp
+(require 'package)
+(setq package-archives '(("melpa" . "http://melpa.org/packages/")
+                         ("gnu" . "http://elpa.gnu.org/packages/")))
+(package-initialize)
+(package-refresh-contents)
+(or (require 'use-package nil t)
+  (progn
+	  (package-install 'use-package)
+	  (message "On a new system. Just installed use-package!")))
+(use-package flycheck :ensure t)
+(use-package rustic :ensure t)
+```
+
+</details>
+
+### If you are using Doom Emacs
 
 Add the following to your `~/.doom.d/packages.el`:
 
