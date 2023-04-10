@@ -5,7 +5,7 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.2.5
+;; Version: 0.3.0
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0"))
 ;; Keywords: convenience, languages
 
@@ -397,8 +397,7 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
   :command ("rust-verify.sh"
             (eval (cdr (verus--run-on-file-command)))
             "--error-format=short"
-            "--expand-errors"
-            "--rlimit=3")
+            "--expand-errors")
   :error-patterns
   ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
    (error (file-name) ":" line ":" column ": error: " (message) line-end)
