@@ -8,7 +8,8 @@ An Emacs mode for [Verus](https://github.com/verus-lang/verus).
   with support for jumping to errors (via `compilation-mode`).
 + Real-time verification (via `flycheck`).
 + Syntax highlighting (improved Verus-specific highlighting on top of `rustic-mode`).
-+ Unicode math support (via prettify-symbols-mode)
++ Jump-to-definition (via `dumb-jump`)
++ Unicode math support (via `prettify-symbols-mode`)
 + Automagic detection of Verus files (via a `verus!` regex search), to enable
   the mode.
 + Automatic (configurable) verus-mode.el version checking to remind you to
@@ -50,6 +51,17 @@ are included here:
 | `C-c ! l`  | List all errors in a separate buffer |
 | `C-c ! n`  | Jump to next error                   |
 | `C-c ! p`  | Jump to previous error               |
+
+## Jump to definition
+
+Verus-mode sets up the necessary things to make `dumb-jump` work. This means,
+the regular xref keybindings should work. For quick reference, some useful ones
+are included here:
+
+| Keybinding | Description                          |
+|------------|--------------------------------------|
+| `M-.`      | Jump to definition                   |
+| `M-,`      | Jump back                            |
 
 ## Unicode Math Prettification
 
@@ -97,6 +109,7 @@ pre-requisites:
 	  (message "On a new system. Just installed use-package!")))
 (use-package flycheck :ensure t)
 (use-package rustic :ensure t)
+(use-package dumb-jump :ensure t)
 ```
 
 </details>
