@@ -5,8 +5,8 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.3.0
-;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0"))
+;; Version: 0.3.1
+;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
 ;; This file is not part of GNU Emacs.
@@ -20,6 +20,7 @@
 ;;
 ;; * Invoking Verus verification
 ;; * Syntax highlighting
+;; * Jump-to-definition (dumb-jump)
 ;; * Unicode math (prettify-symbols-mode)
 ;; * TODO Relative indentation
 ;; * Real-time verification (Flycheck)
@@ -35,6 +36,7 @@
 (require 'rustic)
 (require 'f)
 (require 'flycheck)
+(require 'dumb-jump)
 
 ;;; Customization
 
@@ -148,6 +150,22 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   (if (not (member 'verus compilation-error-regexp-alist))
       (add-to-list 'compilation-error-regexp-alist 'verus)))
 
+;;; Dumb-jump setup
+
+(defun verus--dumb-jump-setup ()
+  "Setup dumb-jump for Verus."
+  ;; (let ((ext '(:language "verus" :ext "rs" :agtype "rust" :rgtype "rust")))
+  ;;   (if (not (member ext dumb-jump-language-file-exts))
+  ;;           (add-to-list 'dumb-jump-language-file-exts ext)))
+  (if (not (member #'dumb-jump-xref-activate xref-backend-functions))
+      (let ((local-xref-backend-functions xref-backend-functions))
+        (add-to-list 'local-xref-backend-functions #'dumb-jump-xref-activate)
+        (setq-local xref-backend-functions local-xref-backend-functions)))
+  (if (fboundp 'xref-show-definitions-completing-read)
+      (setq-local xref-show-definitions-function #'xref-show-definitions-completing-read))
+  (if (not (member "Cargo.toml" dumb-jump-project-denoters))
+      (add-to-list 'dumb-jump-project-denoters "Cargo.toml")))
+
 ;;; Mode definition
 
 ;; TODO FIXME: Get rustic to actually use the right lsp server
@@ -180,7 +198,8 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   (verus--compilation-mode-setup)
   (verus--prettify-symbols-setup)
   (verus--setup-version-check)
-  (verus--flycheck-setup))
+  (verus--flycheck-setup)
+  (verus--dumb-jump-setup))
 
 (defun verus--cleanup ()
   "Cleanup Verus mode."
