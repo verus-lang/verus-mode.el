@@ -5,7 +5,7 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.3.1
+;; Version: 0.3.2
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -180,6 +180,10 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   (if (or (not verus-home) (not (file-exists-p verus-home)))
       (error "Verus home directory %s does not exist" verus-home))
   (setq verus--rust-verify (f-join verus-home verus-verify-location))
+  (when (not verus-enable-experimental-features)
+    ;; Disable rustic's lsp setup, since we don't yet have LSP support in
+    ;; non-experimental mode; this way, we remove the annoying lsp pop up.
+    (setq-local rustic-lsp-client nil))
   (when verus-enable-experimental-features
     ;; NOTE: This is marked as experimental because it doesn't work properly,
     ;; should be fixed in the future, and stabilized.

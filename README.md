@@ -29,6 +29,10 @@ The above keybindings are only active when the current buffer is a Verus file.
 If a file is not detected as a Verus file, you can manually enable Verus-mode
 with `M-x verus-mode`.
 
+Once you've run any of the "Run Verus" commands, you can quickly jump to the
+next or previous error using standard keybindings `M-g n` and `M-g p` for next
+and previous error respectively.
+
 ## Extra Arguments Support
 
 To pass extra arguments to Verus, either use `C-u` before using any of the above
@@ -90,29 +94,12 @@ Clone this repository and add the following to your `~/.emacs`:
 ```
 
 `verus-mode.el` expects that you already have a working
-[rustic](https://github.com/brotzeit/rustic) setup and such; if you are starting
-_entirely_ from scratch with Emacs, then you may wish to include the following
-code in your `.emacs` file _before_ the above code to make sure you have all the
-pre-requisites:
+[rustic](https://github.com/brotzeit/rustic) setup and such.
 
-<details><summary>Click to expand</summary>
-
-``` emacs-lisp
-(require 'package)
-(setq package-archives '(("melpa" . "http://melpa.org/packages/")
-                         ("gnu" . "http://elpa.gnu.org/packages/")))
-(package-initialize)
-(package-refresh-contents)
-(or (require 'use-package nil t)
-  (progn
-	  (package-install 'use-package)
-	  (message "On a new system. Just installed use-package!")))
-(use-package flycheck :ensure t)
-(use-package rustic :ensure t)
-(use-package dumb-jump :ensure t)
-```
-
-</details>
+If you are starting _entirely_ from scratch with Emacs, then you may wish to
+instead just copy [this `init.el` file](./.emacs-sandbox/init.el) to
+`~/.emacs.d/init.el`, and start from there, since it will install all the
+pre-requisites for Verus-mode.el.
 
 ### If you are using Doom Emacs
 
