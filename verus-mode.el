@@ -5,7 +5,7 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.3.2
+;; Version: 0.3.3
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -91,6 +91,8 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
     (define-key map (kbd "C-c C-c C-c") 'verus-run-on-file)
     (define-key map (kbd "C-c C-c C-p") 'verus-run-on-file-with-profiling)
     (define-key map (kbd "C-c C-c C-S-c") 'verus-run-on-crate)
+    (define-key map (kbd "C-c C-n") 'flycheck-next-error)
+    (define-key map (kbd "C-c C-p") 'flycheck-previous-error)
     map))
 
 ;;; Syntax highlighting
@@ -418,7 +420,9 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
 (flycheck-define-checker verus
   "A Verus syntax checker using the Verus compiler."
   :command ("rust-verify.sh"
-            (eval (cdr (verus--run-on-file-command)))
+            (eval
+             (let ((args (cdr (verus--run-on-file-command))))
+               (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
             "--error-format=short"
             "--expand-errors")
   :error-patterns

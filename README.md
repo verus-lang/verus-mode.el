@@ -24,14 +24,19 @@ More features are planned.
 | `C-c C-c C-c`   | Run Verus on the current file                         |
 | `C-c C-c C-p`   | Run Verus on the current file, with profiling enabled |
 | `C-c C-c C-S-c` | Run Verus on the current crate                        |
+| `C-c C-n`       | Jump to next (flycheck) error                         |
+| `C-c C-p`       | Jump to previous (flycheck) error                     |
 
 The above keybindings are only active when the current buffer is a Verus file.
 If a file is not detected as a Verus file, you can manually enable Verus-mode
 with `M-x verus-mode`.
 
-Once you've run any of the "Run Verus" commands, you can quickly jump to the
-next or previous error using standard keybindings `M-g n` and `M-g p` for next
-and previous error respectively.
+The movement commands to jump to previous or next error move across the flycheck
+highlights (i.e., the underlines/squigglies/... you see in your buffer when you
+hit save). If you instead prefer to move across the `*compilation*` buffer that
+opens when you use any of the "Run Verus on ..." commands, then you can use
+standard Emacs keybindings `M-g n` or `M-g p` for next/previous error
+respectively.
 
 ## Extra Arguments Support
 
@@ -50,11 +55,11 @@ Since verus-mode uses flycheck (run upon every save), regular flycheck
 keybindings work too. For quick reference, some of the particularly useful ones
 are included here:
 
-| Keybinding | Description                          |
-|------------|--------------------------------------|
-| `C-c ! l`  | List all errors in a separate buffer |
-| `C-c ! n`  | Jump to next error                   |
-| `C-c ! p`  | Jump to previous error               |
+| Keybinding | Description                                                         |
+|------------|---------------------------------------------------------------------|
+| `C-c ! l`  | List all errors in a separate buffer                                |
+| `C-c ! n`  | Jump to next error (verus-mode.el also binds this to `C-c C-n`)     |
+| `C-c ! p`  | Jump to previous error (verus-mode.el also binds this to `C-c C-p`) |
 
 ## Jump to definition
 
