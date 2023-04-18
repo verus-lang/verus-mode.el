@@ -72,6 +72,12 @@ are included here:
 | `M-.`      | Jump to definition                   |
 | `M-,`      | Jump back                            |
 
+To make sure that jump to definition works properly as well as fast, you need to
+make sure you have [ripgrep](https://github.com/BurntSushi/ripgrep) installed on
+your system with PCRE2 support (you can confirm this by running `rg --engine
+pcre2 foo` in an empty directory: it'll complain about lack of pcre2 support if
+you don't have it).
+
 ## Unicode Math Prettification
 
 Verus-mode displays keywords like `forall` and `exists` using mathematical
