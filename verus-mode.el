@@ -420,7 +420,9 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
 (flycheck-define-checker verus
   "A Verus syntax checker using the Verus compiler."
   :command ("rust-verify.sh"
-            (eval (cdr (verus--run-on-file-command)))
+            (eval
+             (let ((args (cdr (verus--run-on-file-command))))
+               (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
             "--error-format=short"
             "--expand-errors")
   :error-patterns
