@@ -29,6 +29,10 @@ The above keybindings are only active when the current buffer is a Verus file.
 If a file is not detected as a Verus file, you can manually enable Verus-mode
 with `M-x verus-mode`.
 
+Once you've run any of the "Run Verus" commands, you can quickly jump to the
+next or previous error using standard keybindings `M-g n` and `M-g p` for next
+and previous error respectively.
+
 ## Extra Arguments Support
 
 To pass extra arguments to Verus, either use `C-u` before using any of the above
