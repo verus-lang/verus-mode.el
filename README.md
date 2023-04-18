@@ -85,6 +85,13 @@ symbols `∀` and `∃`. If you dislike this behavior, you can disable this by
 turning off `prettify-symbols-mode` (use `M-x prettify-symbols-mode` to toggle
 this in a single buffer).
 
+If you would like to customize the symbols used for prettification (including
+adding new ones, or removing specific prettifications that you do not want), you
+can do so via `M-x customize-variable RET verus-symbols-alist RET` and use the
+customization interface (where the keys are the symbol that would be prettified,
+and the values are the Unicode code points that the respective key would be
+replaced with).
+
 ## Install
 
 Your installation steps for using `verus-mode.el` may vary depending on how your
