@@ -5,7 +5,7 @@
 ;; URL: https://github.com/jaybosamiya/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.3.3
+;; Version: 0.4.0
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -51,10 +51,15 @@ May be either nil (use $VERUS_HOME) or an absolute path."
   :type 'directory
   :risky t)
 
-(defcustom verus-verify-location "source/tools/rust-verify.sh"
-  "Where to find the Verus verification script, relative to `verus-home'."
+(defcustom verus-verify-locations
+  '("source/target-verus/release/verus"
+    "source/target-verus/debug/verus"
+    "source/tools/rust-verify.sh")
+  "Locations to find the Verus verification script, relative to `verus-home'.
+
+These are checked in-order to figure out how to run Verus."
   :group 'verus
-  :type 'file
+  :type '(repeat string)
   :risky t)
 
 (defcustom verus-analyzer nil
@@ -181,7 +186,16 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
       (setq verus-home (getenv "VERUS_HOME")))
   (if (or (not verus-home) (not (file-exists-p verus-home)))
       (error "Verus home directory %s does not exist" verus-home))
-  (setq verus--rust-verify (f-join verus-home verus-verify-location))
+  (setq verus--rust-verify
+        (cl-find-if #'file-executable-p
+                    (mapcar (lambda (loc) (f-join verus-home loc))
+                            verus-verify-locations)))
+  (when (not verus--rust-verify)
+    (error "Could not find way to execute Verus in any of the following locations: %s"
+           (mapcar (lambda (loc) (f-join verus-home loc))
+                   verus-verify-locations)))
+  (when (string-suffix-p "rust-verify.sh" verus--rust-verify)
+    (message "WARNING: You are using an old version of Verus.  This may soon be unsupported.  Please update to the latest version."))
   (when (not verus-enable-experimental-features)
     ;; Disable rustic's lsp setup, since we don't yet have LSP support in
     ;; non-experimental mode; this way, we remove the annoying lsp pop up.
