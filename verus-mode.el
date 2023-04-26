@@ -373,6 +373,23 @@ buffer visiting the file, otherwise throws an error."
        (verus--extra-args-from-cargo-toml)
        (list crate-root)))))
 
+(defun verus--current-module-name ()
+  "Return the `::'-delimited name of current module.
+
+Utilizes the current buffer's file name, but also accounts for
+the path from the crate root file to the current buffer."
+  (if (verus--has-modules-in-file)
+      (error "UNREACHABLE. Should not invoke current-module-name on a file with submodules"))
+  (let ((root (verus--crate-root-file))
+        (buf (buffer-file-name)))
+    (if (string= buf root)
+        (error "UNREACHABLE. Should not invoke current-module-name on root of crate"))
+    (let ((rel (f-no-ext (f-relative buf (f-dirname root)))))
+      (replace-regexp-in-string
+       "::mod" ""
+       (replace-regexp-in-string
+        "/" "::" rel)))))
+
 (defun verus--run-on-file-command ()
   "Return the command to run Verus on the current file.
 
@@ -389,7 +406,7 @@ buffer visiting the file, otherwise throws an error."
     ((string= (buffer-file-name) (verus--crate-root-file))
      (list "--verify-root"))
     (t
-     (list "--verify-module" (f-base (buffer-file-name)))))))
+     (list "--verify-module" (verus--current-module-name))))))
 
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
