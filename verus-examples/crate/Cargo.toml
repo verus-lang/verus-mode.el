@@ -1,0 +1,9 @@
+[package]
+name = "verustest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[package.metadata.verus.ide]
+extra_args = "--crate-type=dylib"
