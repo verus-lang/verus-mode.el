@@ -3,5 +3,5 @@ help:
     @just --list --unsorted
 
 # Open an Emacs sandbox, with Verus-mode installed
-emacs-sandbox:
-    with-emacs.sh --dir .emacs-sandbox ./verus-examples
+emacs-sandbox *args='':
+    with-emacs.sh --no-refresh-packages --no-package --dir .emacs-sandbox -- ./verus-examples {{args}}
