@@ -2,10 +2,10 @@
 
 ;; Copyright (C) 2023 Jay Bosamiya
 ;; Author: Jay Bosamiya <verus@jaybosamiya.com>
-;; URL: https://github.com/jaybosamiya/verus-mode.el
+;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.4.0
+;; Version: 0.4.1
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -472,10 +472,10 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
 (defun verus--verus-mode-el-latest-available-version ()
   "Get the latest available version for verus-mode.el."
   (let ((version (with-temp-buffer
-                   ;; Insert "https://raw.githubusercontent.com/jaybosamiya/verus-mode.el/main/verus-mode.el" into the buffer
+                   ;; Insert "https://raw.githubusercontent.com/verus-lang/verus-mode.el/main/verus-mode.el" into the buffer
                    ;; suppressing any messages.
                    (let ((url-show-status nil))
-                     (url-insert-file-contents "https://raw.githubusercontent.com/jaybosamiya/verus-mode.el/main/verus-mode.el"))
+                     (url-insert-file-contents "https://raw.githubusercontent.com/verus-lang/verus-mode.el/main/verus-mode.el"))
                    (goto-char (point-min))
                    (re-search-forward ";; Version: \\([0-9.]+\\)")
                    (match-string 1))))
