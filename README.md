@@ -125,7 +125,7 @@ Add the following to your `~/.doom.d/packages.el`:
 
 ```emacs-lisp
 (package! verus-mode
-  :recipe (:host github :repo "jaybosamiya/verus-mode.el"))
+  :recipe (:host github :repo "verus-lang/verus-mode.el"))
 ```
 
 and the following to your `~/.doom.d/config.el`:
