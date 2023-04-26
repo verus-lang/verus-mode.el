@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.4.1
+;; Version: 0.4.2
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -238,17 +238,20 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
 
 (defun verus--is-verus-file ()
   "Return non-nil if the current buffer is a Verus file.
-This is done by checking if the file contains a string that is
-'verus!' followed by any number of spaces, and then an opening
-curly brace.
 
-Alternatively, if the file has a 'test_verify_one_file!'
-similarly, then it belongs to the Verus test suite, and also
-counts as a Verus file."
+This is done by checking for a collection of things that tend to
+show up in Verus files."
   (save-excursion
     (goto-char (point-min))
-    (or (re-search-forward "^[ \t]*verus![ \t]*{" nil t)
-        (re-search-forward "^[ \t]*test_verify_one_file![ \t]*{" nil t))))
+    (or
+     ;; Check for a bunch of common Verus markers
+     (re-search-forward "^[ \t]*verus![ \t]*{" nil t)
+     (re-search-forward "^[ \t]*test_verify_one_file![ \t]*{" nil t)
+     (re-search-forward "^[ \t]*use[ \t]+vstd::" nil t)
+     ;; Or if none exist, then see if we have extra args specified in the
+     ;; Cargo.toml, which indicates that the files in the directory should be
+     ;; marked as Verus files.
+     (verus--extra-args-from-cargo-toml))))
 
 (defun verus--is-main-file ()
   "Return non-nil if the current buffer is a Verus main file.
