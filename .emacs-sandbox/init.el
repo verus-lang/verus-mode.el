@@ -3,9 +3,9 @@
 (setq package-archives '(("melpa" . "http://melpa.org/packages/")
                          ("gnu" . "http://elpa.gnu.org/packages/")))
 (package-initialize)
-(package-refresh-contents)
 (or (require 'use-package nil t)
     (progn
+      (package-refresh-contents)
       (package-install 'use-package)
       (message "On a new system. Just installed use-package!")))
 
