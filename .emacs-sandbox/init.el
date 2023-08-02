@@ -41,7 +41,7 @@
   ;; complain loudly.
   (if (seq-find (lambda (path) (string-prefix-p "PATH_TO_" path)) load-path)
       (error "Please replace the string 'PATH_TO_VERUS_MODE_DIR' in your .emacs with the path to the directory containing the verus-mode.el file"))
-  (if (string-prefix-p verus-home "PATH_TO_")
+  (if (string-prefix-p "PATH_TO_" verus-home)
       (error "Please replace the string 'PATH_TO_VERUS_DIR' in your .emacs with the path to Verus")))
 
 ;; Actually load verus-mode.el
