@@ -1,11 +1,11 @@
-;;; verus-mode.el --- Support for Verus programming -*- lexical-binding: t; indent-tabs-mode: nil; no-byte-compile: t; -*-
+;;; verus-mode.el --- Support for Verus programming -*- lexical-binding: t; indent-tabs-mode: nil; -*-
 
 ;; Copyright (C) 2023 Jay Bosamiya
 ;; Author: Jay Bosamiya <verus@jaybosamiya.com>
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.4.3
+;; Version: 0.4.4
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -24,9 +24,6 @@
 ;; * Unicode math (prettify-symbols-mode)
 ;; * TODO Relative indentation
 ;; * Real-time verification (Flycheck)
-
-;; Note: Byte-compilation is temporarily disabled on this package, to make it
-;; easier to develop verus-mode. It will be re-enabled at some point.
 
 
 ;;; Code:
