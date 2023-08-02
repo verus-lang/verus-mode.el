@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.4.2
+;; Version: 0.4.3
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -54,6 +54,8 @@ May be either nil (use $VERUS_HOME) or an absolute path."
 (defcustom verus-verify-locations
   '("source/target-verus/release/verus"
     "source/target-verus/debug/verus"
+    "source/target-verus/release/verus.exe"
+    "source/target-verus/debug/verus.exe"
     "source/tools/rust-verify.sh")
   "Locations to find the Verus verification script, relative to `verus-home'.
 
