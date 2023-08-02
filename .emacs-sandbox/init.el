@@ -28,7 +28,7 @@
     ;; and instead automatically do a fixup since we know exactly
     ;; where things should be.
     (progn
-      (setq load-path (seq-filter (lambda (path) (not (string-match-p "PATH_TO_VERUS_MODE_DIR" path))) load-path))
+      (setq load-path (seq-filter (lambda (path) (not (string-prefix-p "PATH_TO_" path))) load-path))
       (add-to-list 'load-path (file-name-directory (directory-file-name user-emacs-directory)))
       ;; Set `verus-home' to the value read from the file `.verus-home' in the
       ;; `user-emacs-directory', stripping any surrounding whitespace.
@@ -39,9 +39,9 @@
   ;; user's machine, and thus should make sure that the constants are
   ;; actually sane. If the constants haven't been updated, then
   ;; complain loudly.
-  (if (seq-find (lambda (path) (string-match-p "PATH_TO_VERUS_MODE_DIR" path)) load-path)
+  (if (seq-find (lambda (path) (string-prefix-p "PATH_TO_" path)) load-path)
       (error "Please replace the string 'PATH_TO_VERUS_MODE_DIR' in your .emacs with the path to the directory containing the verus-mode.el file"))
-  (if (string-equal verus-home "PATH_TO_VERUS_DIR")
+  (if (string-prefix-p verus-home "PATH_TO_")
       (error "Please replace the string 'PATH_TO_VERUS_DIR' in your .emacs with the path to Verus")))
 
 ;; Actually load verus-mode.el
