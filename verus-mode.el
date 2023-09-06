@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.5.0
+;; Version: 0.5.1
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -263,7 +263,7 @@ This is done by checking if the file contains a `fn main` function."
   "Return non-nil if the current buffer has modules in it."
   (save-excursion
     (goto-char (point-min))
-    (re-search-forward "[ \t]*mod[ \t]+" nil t)))
+    (re-search-forward "^[ \t]*mod[ \t]+" nil t)))
 
 (defun verus--verus-mode-or-rust-mode ()
   "Decide whether to use Verus mode or Rust mode."
