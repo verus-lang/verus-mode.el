@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.4.4
+;; Version: 0.5.0
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -302,23 +302,28 @@ This is done by checking if the file contains a `fn main` function."
 (defun verus--crate-root-file ()
   "Find the root of the current crate. Usually either `main.rs' or `lib.rs'."
   (let ((root (locate-dominating-file default-directory "Cargo.toml"))
-        (is-main (verus--is-main-file)))
+        (is-main (verus--is-main-file))
+        (vstd-root (locate-dominating-file default-directory "vstd.rs")))
     (if is-main
         (buffer-file-name)
-      (if (not root)
+      (if vstd-root
           (progn
-            (when (not verus--reported-non-crate-file)
-              (if (not is-main)
-                  (message "Not in a crate, using current file as root"))
-              (setq-local verus--reported-non-crate-file t))
-            (buffer-file-name))
-        (let ((lib (f-join root "src/lib.rs"))
-              (main (f-join root "src/main.rs")))
-          (if (file-exists-p lib)
-              lib
-            (if (file-exists-p main)
-                main
-              (error "Could not find crate root file"))))))))
+            (message "Found vstd.rs, assuming we are in vstd.")
+            (f-join vstd-root "vstd.rs"))
+        (if (not root)
+            (progn
+              (when (not verus--reported-non-crate-file)
+                (if (not is-main)
+                    (message "Not in a crate, using current file as root"))
+                (setq-local verus--reported-non-crate-file t))
+              (buffer-file-name))
+          (let ((lib (f-join root "src/lib.rs"))
+                (main (f-join root "src/main.rs")))
+            (if (file-exists-p lib)
+                lib
+              (if (file-exists-p main)
+                  main
+                (error "Could not find crate root file")))))))))
 
 (defun verus--extra-args-from-cargo-toml ()
   "Return a list of extra arguments to pass to Verus.
@@ -369,6 +374,9 @@ buffer visiting the file, otherwise throws an error."
        (list verus--rust-verify)
        (if (string-suffix-p "lib.rs" crate-root)
            (list "--crate-type=lib"))
+       (if (string-suffix-p "vstd.rs" crate-root)
+           (list "--crate-type=lib"
+                 "--no-vstd"))
        (verus--extra-args-from-cargo-toml)
        (list crate-root)))))
 
