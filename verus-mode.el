@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.5.1
+;; Version: 0.5.2
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -393,7 +393,7 @@ the path from the crate root file to the current buffer."
         (error "UNREACHABLE. Should not invoke current-module-name on root of crate"))
     (let ((rel (f-no-ext (f-relative buf (f-dirname root)))))
       (replace-regexp-in-string
-       "::mod" ""
+       "::mod$" ""
        (replace-regexp-in-string
         "/" "::" rel)))))
 
