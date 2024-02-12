@@ -74,7 +74,10 @@ that has had `cargo xtask dist && gunzip
   :risky t)
 
 (defcustom verus-auto-check-version t
-  "If non-nil, automatically check for a new version of verus-mode.el, once per Emacs session."
+  "Automatic checks for new version of verus-mode.el.
+
+If non-nil, automatically check for a new version of
+verus-mode.el, once per Emacs session."
   :group 'verus
   :type 'boolean)
 
@@ -86,7 +89,12 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   :type 'integer)
 
 (defcustom verus-enable-experimental-features nil
-  "If non-nil, enable experimental features. These features are not guaranteed to work, and may change or be removed at any time.")
+  "If non-nil, enable experimental features.
+
+These features are not guaranteed to work, and may change or be
+removed at any time."
+  :group 'verus
+  :type 'boolean)
 
 ;;; Keymaps
 
