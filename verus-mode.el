@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.6.0
+;; Version: 0.6.1
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -384,19 +384,15 @@ ones are relative to the Cargo.toml)."
         (cwd (f-full default-directory)))
     (when args
       (mapcar (lambda (arg)
-                (if (string-match "=" arg)
-                    (let ((lhs (substring arg 0 (match-beginning 0)))
-                          (rhs (substring arg (match-end 0))))
-                      (message "lhs: %s, rhs: %s" lhs rhs)
-                      (if (or (string-prefix-p "./" rhs)
-                              (string-prefix-p "../" rhs))
-                          (concat lhs "=" (verus--path-shift-relative rhs root cwd))
-                        arg))
-                  (if (or (string-prefix-p "./" arg)
-                          (string-prefix-p "../" arg))
-                      (verus--path-shift-relative arg root cwd)
-                    arg)))
-              args))))
+                (let* ((xs (split-string arg "="))
+                       (rxs (reverse xs))
+                       (last (car rxs))
+                       (rest (reverse (cdr rxs))))
+                  (if (or (string-prefix-p "./" last)
+                          (string-prefix-p "../" last))
+                      (concat (string-join rest "=") "="
+                              (verus--path-shift-relative last root cwd))
+                    arg))) args))))
 
 (defun verus--run-on-crate-command ()
   "Return the command to run Verus on the current crate.
