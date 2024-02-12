@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.5.2
+;; Version: 0.6.0
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -74,7 +74,10 @@ that has had `cargo xtask dist && gunzip
   :risky t)
 
 (defcustom verus-auto-check-version t
-  "If non-nil, automatically check for a new version of verus-mode.el, once per Emacs session."
+  "Automatic checks for new version of verus-mode.el.
+
+If non-nil, automatically check for a new version of
+verus-mode.el, once per Emacs session."
   :group 'verus
   :type 'boolean)
 
@@ -86,7 +89,12 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   :type 'integer)
 
 (defcustom verus-enable-experimental-features nil
-  "If non-nil, enable experimental features. These features are not guaranteed to work, and may change or be removed at any time.")
+  "If non-nil, enable experimental features.
+
+These features are not guaranteed to work, and may change or be
+removed at any time."
+  :group 'verus
+  :type 'boolean)
 
 ;;; Keymaps
 
@@ -325,11 +333,10 @@ This is done by checking if the file contains a `fn main` function."
                   main
                 (error "Could not find crate root file")))))))))
 
-(defun verus--extra-args-from-cargo-toml ()
-  "Return a list of extra arguments to pass to Verus.
+(defun verus--extra-args-from-cargo-toml--direct ()
+  "The args from the Cargo.toml, directly, without modification.
 
-This reads the `extra_args` key from the `package.metadata.verus.ide`
-table in the Cargo.toml for the current crate."
+You probably instead want `verus--extra-args-from-cargo-toml'."
   (let ((root (locate-dominating-file default-directory "Cargo.toml")))
     (when root
       (let* ((toml (f-join root "Cargo.toml"))
@@ -359,6 +366,37 @@ table in the Cargo.toml for the current crate."
                         (buffer-substring start end))))))))
         (when extra-args
           (split-string-and-unquote (string-trim extra-args)))))))
+
+(defun verus--path-shift-relative (path old new)
+  "Shift relative PATH from OLD to NEW."
+  (f-relative (f-join old path) new))
+
+(defun verus--extra-args-from-cargo-toml ()
+  "Return a list of extra arguments to pass to Verus.
+
+This reads the `extra_args` key from the
+`package.metadata.verus.ide` table in the Cargo.toml for the
+current crate. It additionally updates any paths found to be
+relative to the current working directory (while the original
+ones are relative to the Cargo.toml)."
+  (let ((root (locate-dominating-file default-directory "Cargo.toml"))
+        (args (verus--extra-args-from-cargo-toml--direct))
+        (cwd (f-full default-directory)))
+    (when args
+      (mapcar (lambda (arg)
+                (if (string-match "=" arg)
+                    (let ((lhs (substring arg 0 (match-beginning 0)))
+                          (rhs (substring arg (match-end 0))))
+                      (message "lhs: %s, rhs: %s" lhs rhs)
+                      (if (or (string-prefix-p "./" rhs)
+                              (string-prefix-p "../" rhs))
+                          (concat lhs "=" (verus--path-shift-relative rhs root cwd))
+                        arg))
+                  (if (or (string-prefix-p "./" arg)
+                          (string-prefix-p "../" arg))
+                      (verus--path-shift-relative arg root cwd)
+                    arg)))
+              args))))
 
 (defun verus--run-on-crate-command ()
   "Return the command to run Verus on the current crate.
