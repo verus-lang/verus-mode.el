@@ -267,6 +267,10 @@ This is done by checking if the file contains a `fn main` function."
     (goto-char (point-min))
     (re-search-forward "[ \t]*fn[ \t]+main[ \t]*(" nil t)))
 
+(defun verus--is-a-verus-example-file ()
+  "Return non-nil if the current buffer is in an example directory in Verus."
+  (locate-dominating-file default-directory "source/rust_verify/example"))
+
 (defun verus--has-modules-in-file ()
   "Return non-nil if the current buffer has modules in it."
   (save-excursion
@@ -311,27 +315,30 @@ This is done by checking if the file contains a `fn main` function."
   "Find the root of the current crate. Usually either `main.rs' or `lib.rs'."
   (let ((root (locate-dominating-file default-directory "Cargo.toml"))
         (is-main (verus--is-main-file))
+        (is-example (verus--is-a-verus-example-file))
         (vstd-root (locate-dominating-file default-directory "vstd.rs")))
-    (if is-main
+    (if is-example
         (buffer-file-name)
-      (if vstd-root
-          (progn
-            (message "Found vstd.rs, assuming we are in vstd.")
-            (f-join vstd-root "vstd.rs"))
-        (if (not root)
+      (if is-main
+          (buffer-file-name)
+        (if vstd-root
             (progn
-              (when (not verus--reported-non-crate-file)
-                (if (not is-main)
-                    (message "Not in a crate, using current file as root"))
-                (setq-local verus--reported-non-crate-file t))
-              (buffer-file-name))
-          (let ((lib (f-join root "src/lib.rs"))
-                (main (f-join root "src/main.rs")))
-            (if (file-exists-p lib)
-                lib
-              (if (file-exists-p main)
-                  main
-                (error "Could not find crate root file")))))))))
+              (message "Found vstd.rs, assuming we are in vstd.")
+              (f-join vstd-root "vstd.rs"))
+          (if (not root)
+              (progn
+                (when (not verus--reported-non-crate-file)
+                  (if (not is-main)
+                      (message "Not in a crate, using current file as root"))
+                  (setq-local verus--reported-non-crate-file t))
+                (buffer-file-name))
+            (let ((lib (f-join root "src/lib.rs"))
+                  (main (f-join root "src/main.rs")))
+              (if (file-exists-p lib)
+                  lib
+                (if (file-exists-p main)
+                    main
+                  (error "Could not find crate root file"))))))))))
 
 (defun verus--extra-args-from-cargo-toml--direct ()
   "The args from the Cargo.toml, directly, without modification.
