@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.6.2
+;; Version: 0.6.3
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
 ;; Keywords: convenience, languages
 
@@ -269,7 +269,9 @@ This is done by checking if the file contains a `fn main` function."
 
 (defun verus--is-a-verus-example-file ()
   "Return non-nil if the current buffer is in an example directory in Verus."
-  (locate-dominating-file default-directory "source/rust_verify/example"))
+  (when-let ((root (locate-dominating-file default-directory "source/rust_verify/example")))
+    (let ((example-dir (f-join root "source/rust_verify/example")))
+      (string-prefix-p example-dir (f-canonical (f-dirname (buffer-file-name)))))))
 
 (defun verus--has-modules-in-file ()
   "Return non-nil if the current buffer has modules in it."
