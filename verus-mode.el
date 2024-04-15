@@ -282,7 +282,7 @@ This is done by checking if the file contains a `fn main` function."
 (defun verus--is-a-verus-example-file ()
   "Return non-nil if the current buffer is in an example directory in Verus."
   (when-let ((root (locate-dominating-file default-directory "source/rust_verify/example")))
-    (let ((example-dir (f-join root "source/rust_verify/example")))
+    (let ((example-dir (f-canonical (f-join root "source/rust_verify/example"))))
       (string-prefix-p example-dir (f-canonical (f-dirname (buffer-file-name)))))))
 
 (defun verus--has-modules-in-file ()
