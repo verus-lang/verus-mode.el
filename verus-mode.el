@@ -109,32 +109,36 @@ removed at any time."
 
 ;;; Syntax highlighting
 
-;; TODO FIXME: Actually do this properly, rather than by using highlights
 (defun verus--syntax-highlight ()
-  "Highlight Verus keywords."
-  (highlight-regexp "\\_<assume\\_>" font-lock-warning-face)
-  (highlight-regexp "\\_<assert\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<ensures\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<recommends\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<requires\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<invariant\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<via\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<when\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<spec\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<proof\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<exec\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<open\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<closed\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<reveal\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<reveal_with_fuel\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<decreases\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<tracked\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<ghost\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<is\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<matches\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<has\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<int\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<nat\\_>" font-lock-keyword-face))
+  "Setup syntax highlighting for Verus keywords."
+  (font-lock-add-keywords
+   nil
+   `((,(regexp-opt '("assert"
+                     "assume"
+                     "closed"
+                     "decreases"
+                     "ensures"
+                     "exec"
+                     "ghost"
+                     "has"
+                     "invariant"
+                     "is"
+                     "matches"
+                     "open"
+                     "proof"
+                     "recommends"
+                     "requires"
+                     "reveal"
+                     "reveal_with_fuel"
+                     "spec"
+                     "tracked"
+                     "via"
+                     "when") 'symbols)
+      . font-lock-keyword-face)))
+  (font-lock-add-keywords
+   nil
+   `((,(regexp-opt '("int" "nat") 'symbols)
+      . font-lock-type-face))))
 
 ;;; Unicode math (prettify-symbols-mode)
 
