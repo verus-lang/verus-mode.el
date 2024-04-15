@@ -5,8 +5,8 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.6.3
-;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
+;; Version: 0.6.4
+;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (toml "0.0.1"))
 ;; Keywords: convenience, languages
 
 ;; This file is not part of GNU Emacs.
@@ -34,6 +34,7 @@
 (require 'f)
 (require 'flycheck)
 (require 'dumb-jump)
+(require 'toml)
 
 ;;; Customization
 
@@ -109,24 +110,36 @@ removed at any time."
 
 ;;; Syntax highlighting
 
-;; TODO FIXME: Actually do this properly, rather than by using highlights
 (defun verus--syntax-highlight ()
-  "Highlight Verus keywords."
-  (highlight-regexp "\\_<assume\\_>" font-lock-warning-face)
-  (highlight-regexp "\\_<assert\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<ensures\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<requires\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<invariant\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<spec\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<proof\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<exec\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<open\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<closed\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<reveal\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<reveal_with_fuel\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<decreases\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<int\\_>" font-lock-keyword-face)
-  (highlight-regexp "\\_<nat\\_>" font-lock-keyword-face))
+  "Setup syntax highlighting for Verus keywords."
+  (font-lock-add-keywords
+   nil
+   `((,(regexp-opt '("assert"
+                     "assume"
+                     "closed"
+                     "decreases"
+                     "ensures"
+                     "exec"
+                     "ghost"
+                     "has"
+                     "invariant"
+                     "is"
+                     "matches"
+                     "open"
+                     "proof"
+                     "recommends"
+                     "requires"
+                     "reveal"
+                     "reveal_with_fuel"
+                     "spec"
+                     "tracked"
+                     "via"
+                     "when") 'symbols)
+      . font-lock-keyword-face)))
+  (font-lock-add-keywords
+   nil
+   `((,(regexp-opt '("int" "nat") 'symbols)
+      . font-lock-type-face))))
 
 ;;; Unicode math (prettify-symbols-mode)
 
@@ -270,7 +283,7 @@ This is done by checking if the file contains a `fn main` function."
 (defun verus--is-a-verus-example-file ()
   "Return non-nil if the current buffer is in an example directory in Verus."
   (when-let ((root (locate-dominating-file default-directory "source/rust_verify/example")))
-    (let ((example-dir (f-join root "source/rust_verify/example")))
+    (let ((example-dir (f-canonical (f-join root "source/rust_verify/example"))))
       (string-prefix-p example-dir (f-canonical (f-dirname (buffer-file-name)))))))
 
 (defun verus--has-modules-in-file ()
@@ -315,66 +328,35 @@ This is done by checking if the file contains a `fn main` function."
 
 (defun verus--crate-root-file ()
   "Find the root of the current crate. Usually either `main.rs' or `lib.rs'."
-  (let ((root (locate-dominating-file default-directory "Cargo.toml"))
-        (is-main (verus--is-main-file))
-        (is-example (verus--is-a-verus-example-file))
-        (vstd-root (locate-dominating-file default-directory "vstd.rs")))
-    (if is-example
+  (let ((is-main (verus--is-main-file)))
+    (if (or is-main (verus--is-a-verus-example-file))
         (buffer-file-name)
-      (if is-main
-          (buffer-file-name)
-        (if vstd-root
-            (progn
-              (message "Found vstd.rs, assuming we are in vstd.")
-              (f-join vstd-root "vstd.rs"))
-          (if (not root)
-              (progn
-                (when (not verus--reported-non-crate-file)
-                  (if (not is-main)
-                      (message "Not in a crate, using current file as root"))
-                  (setq-local verus--reported-non-crate-file t))
-                (buffer-file-name))
+      (if-let ((vstd-root (locate-dominating-file default-directory "vstd.rs")))
+          (progn (message "Found vstd.rs, assuming we are in vstd.")
+                 (f-join vstd-root "vstd.rs"))
+        (if-let ((root (locate-dominating-file default-directory "Cargo.toml")))
             (let ((lib (f-join root "src/lib.rs"))
                   (main (f-join root "src/main.rs")))
-              (if (file-exists-p lib)
-                  lib
-                (if (file-exists-p main)
-                    main
-                  (error "Could not find crate root file"))))))))))
+              (cond ((file-exists-p lib) lib)
+                    ((file-exists-p main) main)
+                    (t (error "Could not find crate root file"))))
+          (progn
+            (when (not verus--reported-non-crate-file)
+              (when (not is-main)
+                (message "Not in a crate, using current file as root"))
+              (setq-local verus--reported-non-crate-file t))
+            (buffer-file-name)))))))
 
-(defun verus--extra-args-from-cargo-toml--direct ()
-  "The args from the Cargo.toml, directly, without modification.
-
-You probably instead want `verus--extra-args-from-cargo-toml'."
-  (let ((root (locate-dominating-file default-directory "Cargo.toml")))
-    (when root
-      (let* ((toml (f-join root "Cargo.toml"))
-             ;; NOTE: This is a hack, we should use a TOML parser
-             ;; instead.
-             (verus-table
-              (with-temp-buffer
-                (insert-file-contents toml)
-                (let ((init (re-search-forward "^[ \t]*\\[package.metadata.verus.ide\\][ \t]*$" nil t)))
-                  (if (not init)
-                      nil
-                    (let ((start (point)))
-                      (let ((end (re-search-forward "^[ \t]*\\[.*\\]$" nil t)))
-                        (if end
-                            (buffer-substring start (point))
-                          (buffer-substring start (point-max)))))))))
-             (extra-args
-              (when verus-table
-                (with-temp-buffer
-                  (insert verus-table)
-                  (goto-char (point-min))
-                  (let ((start (re-search-forward "^[ \t]*extra_args[ \t]*=[ \t]*\"\\(.*\\)\"[ \t]*$" nil t)))
-                    (if (not start)
-                        nil
-                      (let ((start (match-beginning 1))
-                            (end (match-end 1)))
-                        (buffer-substring start end))))))))
-        (when extra-args
-          (split-string-and-unquote (string-trim extra-args)))))))
+(defun verus--extract-extra-args-from (toml-file)
+  "Extract the `package.metadata.verus.ide.extra_args' string from the TOML-FILE."
+  (when (and toml-file (file-exists-p toml-file))
+    (let* ((toml (toml:read-from-file toml-file))
+           (package (cdr (assoc "package" toml)))
+           (metadata (cdr (assoc "metadata" package)))
+           (verus (cdr (assoc "verus" metadata)))
+           (ide (cdr (assoc "ide" verus)))
+           (extra-args (cdr (assoc "extra_args" ide))))
+      extra-args)))
 
 (defun verus--path-shift-relative (path old new)
   "Shift relative PATH from OLD to NEW."
@@ -388,9 +370,10 @@ This reads the `extra_args` key from the
 current crate. It additionally updates any paths found to be
 relative to the current working directory (while the original
 ones are relative to the Cargo.toml)."
-  (let ((root (locate-dominating-file default-directory "Cargo.toml"))
-        (args (verus--extra-args-from-cargo-toml--direct))
-        (cwd (f-full default-directory)))
+  (let* ((root (locate-dominating-file default-directory "Cargo.toml"))
+         (extra-args-str (verus--extract-extra-args-from (f-join root "Cargo.toml")))
+         (args (split-string-and-unquote (string-trim extra-args-str)))
+         (cwd (f-full default-directory)))
     (when args
       (mapcar (lambda (arg)
                 (let* ((xs (split-string arg "="))

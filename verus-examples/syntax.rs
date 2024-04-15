@@ -537,4 +537,45 @@ trait T {
             j <= r;
 }
 
+enum ThisOrThat {
+    This(nat),
+    That { v: int },
+}
+
+proof fn uses_is(t: ThisOrThat) {
+    match t {
+        ThisOrThat::This(..) => assert(t is This),
+        ThisOrThat::That {..} => assert(t is That),
+    }
+}
+
+proof fn uses_arrow_matches_1(t: ThisOrThat)
+    requires
+        t is That ==> t->v == 3,
+        t is This ==> t->0 == 4,
+{
+    assert(t matches ThisOrThat::This(k) ==> k == 4);
+    assert(t matches ThisOrThat::That { v } ==> v == 3);
+}
+
+proof fn uses_arrow_matches_2(t: ThisOrThat)
+    requires t matches ThisOrThat::That { v: a } && a == 3,
+{
+    assert(t is That && t->v == 3);
+}
+
+#[verifier::external_body]
+struct Collection { }
+
+impl Collection {
+    pub spec fn spec_has(&self, v: nat) -> bool;
+}
+
+proof fn uses_spec_has(c: Collection)
+    requires c has 3,
+{
+    assert(c has 3);
+    assert(c has 3 == c has 3);
+}
+
 } // verus!
