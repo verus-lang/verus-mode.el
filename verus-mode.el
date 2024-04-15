@@ -6,7 +6,7 @@
 
 ;; Created: 13 Feb 2023
 ;; Version: 0.6.3
-;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4"))
+;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (toml "0.0.1"))
 ;; Keywords: convenience, languages
 
 ;; This file is not part of GNU Emacs.
@@ -34,6 +34,7 @@
 (require 'f)
 (require 'flycheck)
 (require 'dumb-jump)
+(require 'toml)
 
 ;;; Customization
 
@@ -346,39 +347,16 @@ This is done by checking if the file contains a `fn main` function."
               (setq-local verus--reported-non-crate-file t))
             (buffer-file-name)))))))
 
-(defun verus--extra-args-from-cargo-toml--direct ()
-  "The args from the Cargo.toml, directly, without modification.
-
-You probably instead want `verus--extra-args-from-cargo-toml'."
-  (let ((root (locate-dominating-file default-directory "Cargo.toml")))
-    (when root
-      (let* ((toml (f-join root "Cargo.toml"))
-             ;; NOTE: This is a hack, we should use a TOML parser
-             ;; instead.
-             (verus-table
-              (with-temp-buffer
-                (insert-file-contents toml)
-                (let ((init (re-search-forward "^[ \t]*\\[package.metadata.verus.ide\\][ \t]*$" nil t)))
-                  (if (not init)
-                      nil
-                    (let ((start (point)))
-                      (let ((end (re-search-forward "^[ \t]*\\[.*\\]$" nil t)))
-                        (if end
-                            (buffer-substring start (point))
-                          (buffer-substring start (point-max)))))))))
-             (extra-args
-              (when verus-table
-                (with-temp-buffer
-                  (insert verus-table)
-                  (goto-char (point-min))
-                  (let ((start (re-search-forward "^[ \t]*extra_args[ \t]*=[ \t]*\"\\(.*\\)\"[ \t]*$" nil t)))
-                    (if (not start)
-                        nil
-                      (let ((start (match-beginning 1))
-                            (end (match-end 1)))
-                        (buffer-substring start end))))))))
-        (when extra-args
-          (split-string-and-unquote (string-trim extra-args)))))))
+(defun verus--extract-extra-args-from (toml-file)
+  "Extract the `package.metadata.verus.ide.extra_args' string from the TOML-FILE."
+  (when (and toml-file (file-exists-p toml-file))
+    (let* ((toml (toml:read-from-file toml-file))
+           (package (cdr (assoc "package" toml)))
+           (metadata (cdr (assoc "metadata" package)))
+           (verus (cdr (assoc "verus" metadata)))
+           (ide (cdr (assoc "ide" verus)))
+           (extra-args (cdr (assoc "extra_args" ide))))
+      extra-args)))
 
 (defun verus--path-shift-relative (path old new)
   "Shift relative PATH from OLD to NEW."
@@ -392,9 +370,10 @@ This reads the `extra_args` key from the
 current crate. It additionally updates any paths found to be
 relative to the current working directory (while the original
 ones are relative to the Cargo.toml)."
-  (let ((root (locate-dominating-file default-directory "Cargo.toml"))
-        (args (verus--extra-args-from-cargo-toml--direct))
-        (cwd (f-full default-directory)))
+  (let* ((root (locate-dominating-file default-directory "Cargo.toml"))
+         (extra-args-str (verus--extract-extra-args-from (f-join root "Cargo.toml")))
+         (args (split-string-and-unquote (string-trim extra-args-str)))
+         (cwd (f-full default-directory)))
     (when args
       (mapcar (lambda (arg)
                 (let* ((xs (split-string arg "="))

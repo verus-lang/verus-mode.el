@@ -13,6 +13,7 @@
 (use-package flycheck :ensure t)
 (use-package rustic :ensure t)
 (use-package dumb-jump :ensure t)
+(use-package toml :ensure t)
 
 ;; Let Emacs know where verus-mode.el even is.
 (add-to-list 'load-path "PATH_TO_VERUS_MODE_DIR")
@@ -54,7 +55,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(package-selected-packages '(use-package rustic flycheck dumb-jump)))
+ '(package-selected-packages '(use-package rustic flycheck dumb-jump toml)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
