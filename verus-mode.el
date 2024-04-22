@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.6.5
+;; Version: 0.6.6
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (toml "0.0.1"))
 ;; Keywords: convenience, languages
 
@@ -370,21 +370,21 @@ This reads the `extra_args` key from the
 current crate. It additionally updates any paths found to be
 relative to the current working directory (while the original
 ones are relative to the Cargo.toml)."
-  (when-let ((root (locate-dominating-file default-directory "Cargo.toml")))
-    (let* ((extra-args-str (verus--extract-extra-args-from (f-join root "Cargo.toml")))
-           (args (split-string-and-unquote (string-trim extra-args-str)))
-           (cwd (f-full default-directory)))
-      (when args
-        (mapcar (lambda (arg)
-                  (let* ((xs (split-string arg "="))
-                         (rxs (reverse xs))
-                         (last (car rxs))
-                         (rest (reverse (cdr rxs))))
-                    (if (or (string-prefix-p "./" last)
-                            (string-prefix-p "../" last))
-                        (concat (string-join rest "=") "="
-                                (verus--path-shift-relative last root cwd))
-                      arg))) args)))))
+  (when-let ((root (locate-dominating-file default-directory "Cargo.toml"))
+             (extra-args-str (verus--extract-extra-args-from (f-join root "Cargo.toml")))
+             (args (split-string-and-unquote (string-trim extra-args-str)))
+             (cwd (f-full default-directory)))
+    (when args
+      (mapcar (lambda (arg)
+                (let* ((xs (split-string arg "="))
+                       (rxs (reverse xs))
+                       (last (car rxs))
+                       (rest (reverse (cdr rxs))))
+                  (if (or (string-prefix-p "./" last)
+                          (string-prefix-p "../" last))
+                      (concat (string-join rest "=") "="
+                              (verus--path-shift-relative last root cwd))
+                    arg))) args))))
 
 (defun verus--run-on-crate-command ()
   "Return the command to run Verus on the current crate.
