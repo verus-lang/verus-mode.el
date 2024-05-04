@@ -186,7 +186,7 @@ removed at any time."
   ;;           (add-to-list 'dumb-jump-language-file-exts ext)))
   (if (not (member #'dumb-jump-xref-activate xref-backend-functions))
       (let ((local-xref-backend-functions xref-backend-functions))
-        (add-to-list 'local-xref-backend-functions #'dumb-jump-xref-activate)
+        (push #'dumb-jump-xref-activate xref-backend-functions)
         (setq-local xref-backend-functions local-xref-backend-functions)))
   (if (fboundp 'xref-show-definitions-completing-read)
       (setq-local xref-show-definitions-function #'xref-show-definitions-completing-read))
