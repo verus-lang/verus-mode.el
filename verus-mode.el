@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.6.6
+;; Version: 0.6.7
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (toml "0.0.1"))
 ;; Keywords: convenience, languages
 
@@ -186,7 +186,7 @@ removed at any time."
   ;;           (add-to-list 'dumb-jump-language-file-exts ext)))
   (if (not (member #'dumb-jump-xref-activate xref-backend-functions))
       (let ((local-xref-backend-functions xref-backend-functions))
-        (add-to-list 'local-xref-backend-functions #'dumb-jump-xref-activate)
+        (push #'dumb-jump-xref-activate xref-backend-functions)
         (setq-local xref-backend-functions local-xref-backend-functions)))
   (if (fboundp 'xref-show-definitions-completing-read)
       (setq-local xref-show-definitions-function #'xref-show-definitions-completing-read))
@@ -349,7 +349,13 @@ This is done by checking if the file contains a `fn main` function."
 
 (defun verus--extract-extra-args-from (toml-file)
   "Extract the `package.metadata.verus.ide.extra_args' string from the TOML-FILE."
-  (when (and toml-file (file-exists-p toml-file))
+  (when (and
+         toml-file
+         (file-exists-p toml-file)
+         (with-temp-buffer
+           (insert-file-contents toml-file)
+           (goto-char (point-min))
+           (search-forward "verus" nil t)))
     (let* ((toml (toml:read-from-file toml-file))
            (package (cdr (assoc "package" toml)))
            (metadata (cdr (assoc "metadata" package)))
@@ -476,7 +482,7 @@ If EXTRA-ARGS is non-nil, then add them to the command."
 (defun verus-run-on-file-with-profiling (prefix)
   "Run Verus on the current file, with profiling enabled.
 
-If PREFIX is non-nil, then enable 'always profiling' mode."
+If PREFIX is non-nil, then enable `always profiling' mode."
   (interactive "p")
   (verus-run-on-file 1 (if (= prefix 1)
                            (list "--profile")
@@ -541,10 +547,10 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
 
 (defvar verus--verus-mode-el-last-version-check-file
   (f-join user-emacs-directory ".verus-mode.el-last-version-check")
-  "The file where we store the last time we checked for a new version of verus-mode.el.")
+  "The file storing the last time we checked for a new version of verus-mode.el.")
 
 (defun verus-check-version-now ()
-  "Check for a new version of verus-mode.el, right now, even if we've already checked recently."
+  "Check for a new version of verus-mode.el, even if already checked recently."
   (interactive)
   (let ((current (verus--verus-mode-el-current-version))
         (latest (verus--verus-mode-el-latest-available-version)))
