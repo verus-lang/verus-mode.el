@@ -476,7 +476,7 @@ If EXTRA-ARGS is non-nil, then add them to the command."
 (defun verus-run-on-file-with-profiling (prefix)
   "Run Verus on the current file, with profiling enabled.
 
-If PREFIX is non-nil, then enable 'always profiling' mode."
+If PREFIX is non-nil, then enable `always profiling' mode."
   (interactive "p")
   (verus-run-on-file 1 (if (= prefix 1)
                            (list "--profile")
@@ -541,10 +541,10 @@ If PREFIX is non-nil, then enable 'always profiling' mode."
 
 (defvar verus--verus-mode-el-last-version-check-file
   (f-join user-emacs-directory ".verus-mode.el-last-version-check")
-  "The file where we store the last time we checked for a new version of verus-mode.el.")
+  "The file storing the last time we checked for a new version of verus-mode.el.")
 
 (defun verus-check-version-now ()
-  "Check for a new version of verus-mode.el, right now, even if we've already checked recently."
+  "Check for a new version of verus-mode.el, even if already checked recently."
   (interactive)
   (let ((current (verus--verus-mode-el-current-version))
         (latest (verus--verus-mode-el-latest-available-version)))
