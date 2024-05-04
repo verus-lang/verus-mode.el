@@ -349,7 +349,13 @@ This is done by checking if the file contains a `fn main` function."
 
 (defun verus--extract-extra-args-from (toml-file)
   "Extract the `package.metadata.verus.ide.extra_args' string from the TOML-FILE."
-  (when (and toml-file (file-exists-p toml-file))
+  (when (and
+         toml-file
+         (file-exists-p toml-file)
+         (with-temp-buffer
+           (insert-file-contents toml-file)
+           (goto-char (point-min))
+           (search-forward "verus" nil t)))
     (let* ((toml (toml:read-from-file toml-file))
            (package (cdr (assoc "package" toml)))
            (metadata (cdr (assoc "metadata" package)))
