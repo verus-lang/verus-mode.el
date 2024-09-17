@@ -489,16 +489,20 @@ If PREFIX is non-nil, then enable `always profiling' mode."
                            (list "--profile")
                          (list "--profile-all"))))
 
-(defun verus-run-on-function-at-point ()
-  "Run Verus on the function at point."
-  (interactive)
+(defun verus-run-on-function-at-point (prefix)
+  "Run Verus on the function at point.
+
+If PREFIX is non-nil, then confirm command to run before running it."
+  (interactive "p")
   (let ((function-name
          (save-excursion
            (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)(" nil t)
              (match-string 1)))))
     (if function-name
-        (verus-run-on-file 1 (list "--verify-function" function-name))
-      (message "Could not auto-detect function to verify."))))
+        (verus-run-on-file prefix (list "--verify-function" function-name))
+      (message "Could not auto-detect function to verify. Try using C-u C-c C-c C-f.")
+      (unless (= prefix 1)
+        (verus-run-on-file prefix (list "--verify-function"))))))
 
 ;;; Flycheck setup
 
