@@ -103,6 +103,7 @@ removed at any time."
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c C-c") 'verus-run-on-file)
     (define-key map (kbd "C-c C-c C-p") 'verus-run-on-file-with-profiling)
+    (define-key map (kbd "C-c C-c C-f") 'verus-run-on-function-at-point)
     (define-key map (kbd "C-c C-c C-S-c") 'verus-run-on-crate)
     (define-key map (kbd "C-c C-n") 'flycheck-next-error)
     (define-key map (kbd "C-c C-p") 'flycheck-previous-error)
@@ -487,6 +488,17 @@ If PREFIX is non-nil, then enable `always profiling' mode."
   (verus-run-on-file 1 (if (= prefix 1)
                            (list "--profile")
                          (list "--profile-all"))))
+
+(defun verus-run-on-function-at-point ()
+  "Run Verus on the function at point."
+  (interactive)
+  (let ((function-name
+         (save-excursion
+           (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)(" nil t)
+             (match-string 1)))))
+    (if function-name
+        (verus-run-on-file 1 (list "--verify-function" function-name))
+      (message "Could not auto-detect function to verify."))))
 
 ;;; Flycheck setup
 
