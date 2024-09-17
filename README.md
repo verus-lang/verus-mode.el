@@ -23,6 +23,7 @@ More features are planned.
 |-----------------|-------------------------------------------------------|
 | `C-c C-c C-c`   | Run Verus on the current file                         |
 | `C-c C-c C-p`   | Run Verus on the current file, with profiling enabled |
+| `C-c C-c C-f`   | Run Verus on the current function                     |
 | `C-c C-c C-S-c` | Run Verus on the current crate                        |
 | `C-c C-n`       | Jump to next (flycheck) error                         |
 | `C-c C-p`       | Jump to previous (flycheck) error                     |
