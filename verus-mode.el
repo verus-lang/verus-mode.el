@@ -496,7 +496,7 @@ If PREFIX is non-nil, then confirm command to run before running it."
   (interactive "p")
   (let ((function-name
          (save-excursion
-           (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)(" nil t)
+           (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)[<(]" nil t)
              (match-string 1)))))
     (if function-name
         (verus-run-on-file prefix (list "--verify-function" function-name))
