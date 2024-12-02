@@ -357,6 +357,11 @@ This is done by checking if the file contains a `fn main` function."
            (insert-file-contents toml-file)
            (goto-char (point-min))
            (search-forward "verus" nil t)))
+    (when (with-temp-buffer
+          (insert-file-contents toml-file)
+          (goto-char (point-min))
+          (search-forward "'" nil t))
+      (error "The TOML parser does not like single quotes. Attempt updating your Cargo.toml file to use only double-quotes. See https://github.com/verus-lang/verus-mode.el/issues/9 for more details"))
     (let* ((toml (toml:read-from-file toml-file))
            (package (cdr (assoc "package" toml)))
            (metadata (cdr (assoc "metadata" package)))
