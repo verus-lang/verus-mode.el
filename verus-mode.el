@@ -200,6 +200,8 @@ removed at any time."
 (defvar-local verus--old-lsp-server rustic-lsp-server)
 (defvar-local verus--old-rutic-analyzer-command rustic-analyzer-command)
 (defvar-local verus--rust-verify nil)
+(defvar-local verus--last-command-file nil)
+(defvar-local verus--last-command-crate nil)
 
 (defun verus--setup ()
   "Setup Verus mode."
@@ -463,9 +465,12 @@ If PREFIX is non-nil, then run ask for the command to run."
     (when verus-command
       (let ((compilation-command
              (mapconcat #'shell-quote-argument verus-command " ")))
-        (compile (if (= prefix 1)
-                     compilation-command
-                   (read-shell-command "Run Verus: " compilation-command)))))))
+        (if (= prefix 1)
+            (if verus--last-command-crate
+                (compile verus--last-command-crate)
+              (compile compilation-command))
+          (setq verus--last-command-crate (read-shell-command "Run Verus: " (if (= prefix 4) compilation-command verus--last-command-crate)))
+          (compile verus--last-command-crate))))))
 
 (defun verus-run-on-file (prefix &optional extra-args)
   "Run Verus on the current file.
@@ -481,9 +486,12 @@ If EXTRA-ARGS is non-nil, then add them to the command."
              (mapconcat #'shell-quote-argument
                         (append verus-command extra-args)
                         " ")))
-        (compile (if (= prefix 1)
-                     compilation-command
-                   (read-shell-command "Run Verus: " compilation-command)))))))
+        (if (= prefix 1)
+            (if verus--last-command-file
+                (compile verus--last-command-file)
+              (compile compilation-command))
+          (setq verus--last-command-file (read-shell-command "Run Verus: " (if (= prefix 4) compilation-command verus--last-command-file)))
+          (compile verus--last-command-file))))))
 
 (defun verus-run-on-file-with-profiling (prefix)
   "Run Verus on the current file, with profiling enabled.
