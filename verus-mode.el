@@ -89,6 +89,14 @@ Ignored if `verus-auto-check-version' is nil. Defaults to once per day."
   :group 'verus
   :type 'integer)
 
+(defcustom verus-partial-verif-of-fn-is-starred nil
+  "If non-nil, add stars `verus-run-function-at-point'.
+
+The starred variant allows Verus to match against any function which has
+the function name as a subset."
+  :group 'verus
+  :type 'boolean)
+
 (defcustom verus-enable-experimental-features nil
   "If non-nil, enable experimental features.
 
@@ -504,7 +512,13 @@ If PREFIX is non-nil, then confirm command to run before running it."
            (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)[<(]" nil t)
              (match-string 1)))))
     (if function-name
-        (verus-run-on-file prefix (list "--verify-function" function-name))
+        (verus-run-on-file
+         prefix
+         (list
+          "--verify-function"
+          (if verus-partial-verif-of-fn-is-starred
+              (concat "*" function-name "*")
+            function-name)))
       (message "Could not auto-detect function to verify. Try using C-u C-c C-c C-f.")
       (unless (= prefix 1)
         (verus-run-on-file prefix (list "--verify-function"))))))
