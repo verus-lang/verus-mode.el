@@ -93,6 +93,13 @@ customization interface (where the keys are the symbol that would be prettified,
 and the values are the Unicode code points that the respective key would be
 replaced with).
 
+If you are seeing boxes rather than mathematical symbols, your installed fonts
+might not support such symbols. You can fix this by installing a font such as
+"Segoe UI Symbol", or "Symbola", or others. You can manually introduce a Unicode
+"forall" symbol by running `C-x 8 RET 2200 RET` (e.g., in a scratch buffer),
+which can be helpful to debug font issues. Linux users might find it helpful to
+remember to run `fc-cache -fv`.
+
 ## Install
 
 Your installation steps for using `verus-mode.el` may vary depending on how your
