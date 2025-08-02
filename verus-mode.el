@@ -211,6 +211,11 @@ removed at any time."
 
 (defun verus--setup ()
   "Setup Verus mode."
+  (when (and (require 'toml nil 'noerror)
+             (not (fboundp 'toml:read-literal-string)))
+    (message (concat "Your toml.el package is outdated and may cause errors "
+                     "when reading Cargo.toml configuration.  Update with: "
+                     "M-x package-refresh-contents then M-x package-install RET toml")))
   (if (not verus-home)
       (setq verus-home (getenv "VERUS_HOME")))
   (if (or (not verus-home) (not (file-exists-p verus-home)))
@@ -365,11 +370,6 @@ This is done by checking if the file contains a `fn main` function."
            (insert-file-contents toml-file)
            (goto-char (point-min))
            (search-forward "verus" nil t)))
-    (when (with-temp-buffer
-          (insert-file-contents toml-file)
-          (goto-char (point-min))
-          (search-forward "'" nil t))
-      (error "The TOML parser does not like single quotes. Attempt updating your Cargo.toml file to use only double-quotes. See https://github.com/verus-lang/verus-mode.el/issues/9 for more details"))
     (let* ((toml (toml:read-from-file toml-file))
            (package (cdr (assoc "package" toml)))
            (metadata (cdr (assoc "metadata" package)))
