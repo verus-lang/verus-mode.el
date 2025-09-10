@@ -432,8 +432,6 @@ buffer visiting the file, otherwise throws an error."
 
 Utilizes the current buffer's file name, but also accounts for
 the path from the crate root file to the current buffer."
-  (if (verus--has-modules-in-file)
-      (error "UNREACHABLE. Should not invoke current-module-name on a file with submodules"))
   (let ((root (verus--crate-root-file))
         (buf (buffer-file-name)))
     (if (string= buf root)
@@ -452,11 +450,6 @@ buffer visiting the file, otherwise throws an error."
   (append
    (verus--run-on-crate-command)
    (cond
-    ((verus--has-modules-in-file)
-     (message
-      (concat "File has modules, running on whole crate. "
-              "Verus#385, once implemented, should support convenient submodules."))
-     nil)
     ((string= (buffer-file-name) (verus--crate-root-file))
      (list "--verify-root"))
     (t
@@ -503,6 +496,28 @@ If PREFIX is non-nil, then enable `always profiling' mode."
                            (list "--profile")
                          (list "--profile-all"))))
 
+(defun verus--run-on-function-command (function-name)
+  "Return the command to run Verus on a specific function.
+
+Returns a list of command-line arguments. If FUNCTION-NAME is nil,
+returns base command for manual function specification."
+  (let ((base-command (verus--run-on-crate-command))
+        (verify-args (cond
+                      ((string= (buffer-file-name) (verus--crate-root-file))
+                       (list "--verify-root"))
+                      ((verus--has-modules-in-file)
+                       (message "Warning: module detection for functions may not be fully accurate in a file that also has submodules.  If you get a failure in module detection, please file an issue at https://github.com/verus-lang/verus-mode.el/issues.")
+                       (list "--verify-only-module" (verus--current-module-name)))
+                      (t
+                       (list "--verify-only-module" (verus--current-module-name)))))
+        (function-args (if function-name
+                           (list "--verify-function"
+                                 (if verus-partial-verif-of-fn-is-starred
+                                     (concat "*" function-name "*")
+                                   function-name))
+                         (list "--verify-function"))))
+    (append base-command verify-args function-args)))
+
 (defun verus-run-on-function-at-point (prefix)
   "Run Verus on the function at point.
 
@@ -513,16 +528,22 @@ If PREFIX is non-nil, then confirm command to run before running it."
            (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)[<(]" nil t)
              (match-string 1)))))
     (if function-name
-        (verus-run-on-file
-         prefix
-         (list
-          "--verify-function"
-          (if verus-partial-verif-of-fn-is-starred
-              (concat "*" function-name "*")
-            function-name)))
+        (let ((verus-command (with-demoted-errors "Verus error: %S"
+                               (verus--run-on-function-command function-name))))
+          (when verus-command
+            (let ((compilation-command
+                   (mapconcat #'shell-quote-argument verus-command " ")))
+              (compile (if (= prefix 1)
+                           compilation-command
+                         (read-shell-command "Run Verus: " compilation-command))))))
       (message "Could not auto-detect function to verify. Try using C-u C-c C-c C-f.")
       (unless (= prefix 1)
-        (verus-run-on-file prefix (list "--verify-function"))))))
+        (let ((verus-command (with-demoted-errors "Verus error: %S"
+                               (verus--run-on-function-command nil))))
+          (when verus-command
+            (let ((compilation-command
+                   (mapconcat #'shell-quote-argument verus-command " ")))
+              (compile (read-shell-command "Run Verus: " compilation-command)))))))))
 
 ;;; Flycheck setup
 
