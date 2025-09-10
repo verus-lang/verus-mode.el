@@ -286,7 +286,10 @@ show up in Verus files."
      ;; Or if none exist, then see if we have extra args specified in the
      ;; Cargo.toml, which indicates that the files in the directory should be
      ;; marked as Verus files.
-     (verus--extra-args-from-cargo-toml))))
+     (verus--extra-args-from-cargo-toml)
+     ;; Or check if this is a cargo-verus project
+     (when-let ((root (locate-dominating-file default-directory "Cargo.toml")))
+       (verus--is-cargo-verus-project-p (f-join root "Cargo.toml"))))))
 
 (defun verus--is-main-file ()
   "Return non-nil if the current buffer is a Verus main file.
@@ -362,6 +365,23 @@ This is done by checking if the file contains a `fn main` function."
               (setq-local verus--reported-non-crate-file t))
             (buffer-file-name)))))))
 
+(defun verus--is-cargo-verus-project-p (toml-file)
+  "Check if TOML-FILE indicates a cargo-verus project.
+A project is cargo-verus-supported if its Cargo.toml contains
+package.metadata.verus.verify as true."
+  (when (and toml-file (file-exists-p toml-file))
+    (when (with-temp-buffer
+            (insert-file-contents toml-file)
+            (goto-char (point-min))
+            (search-forward "'" nil t))
+      (error "The TOML parser does not like single quotes. Attempt updating your Cargo.toml file to use only double-quotes. See https://github.com/verus-lang/verus-mode.el/issues/9 for more details"))
+    (let* ((toml (toml:read-from-file toml-file))
+           (package (cdr (assoc "package" toml)))
+           (metadata (cdr (assoc "metadata" package)))
+           (verus (cdr (assoc "verus" metadata)))
+           (verify (cdr (assoc "verify" verus))))
+      (and verify (eq verify t)))))
+
 (defun verus--extract-extra-args-from (toml-file)
   "Extract the `package.metadata.verus.ide.extra_args' string from the TOML-FILE."
   (when (and
@@ -407,6 +427,11 @@ ones are relative to the Cargo.toml)."
                               (verus--path-shift-relative last root cwd))
                     arg))) args))))
 
+(defun verus--cargo-verus-command (args)
+  "Build cargo-verus command with ARGS.
+Returns a list of command-line arguments for cargo verus verify."
+  (append (list "cargo" "verus" "verify" "--") args))
+
 (defun verus--run-on-crate-command ()
   "Return the command to run Verus on the current crate.
 
@@ -415,17 +440,25 @@ buffer visiting the file, otherwise throws an error."
   (let ((file (buffer-file-name)))
     (when (not file)
       (error "Buffer is not visiting a file. Cannot run Verus"))
-    (let ((default-directory (f-dirname file))
-          (crate-root (verus--crate-root-file)))
-      (append
-       (list verus--rust-verify)
-       (if (string-suffix-p "lib.rs" crate-root)
-           (list "--crate-type=lib"))
-       (if (string-suffix-p "vstd.rs" crate-root)
-           (list "--crate-type=lib"
-                 "--no-vstd"))
-       (verus--extra-args-from-cargo-toml)
-       (list crate-root)))))
+    (let* ((default-directory (f-dirname file))
+           (crate-root (verus--crate-root-file))
+           (cargo-toml-root (locate-dominating-file default-directory "Cargo.toml"))
+           (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
+           (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml))))
+      (if use-cargo-verus
+          (let ((default-directory cargo-toml-root))
+            (verus--cargo-verus-command
+             ;; TODO(jayb): Should we actually also be passing the `verus--extra-args-from-cargo-toml' here?
+             nil))
+        (append
+         (list verus--rust-verify)
+         (if (string-suffix-p "lib.rs" crate-root)
+             (list "--crate-type=lib"))
+         (if (string-suffix-p "vstd.rs" crate-root)
+             (list "--crate-type=lib"
+                   "--no-vstd"))
+         (verus--extra-args-from-cargo-toml)
+         (list crate-root))))))
 
 (defun verus--current-module-name ()
   "Return the `::'-delimited name of current module.
@@ -460,8 +493,13 @@ buffer visiting the file, otherwise throws an error."
 
 If PREFIX is non-nil, then run ask for the command to run."
   (interactive "p")
-  (let ((verus-command (with-demoted-errors "Verus error: %S"
-                         (verus--run-on-crate-command))))
+  (let* ((file (buffer-file-name))
+         (cargo-toml-root (when file (locate-dominating-file (f-dirname file) "Cargo.toml")))
+         (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
+         (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml)))
+         (default-directory (if use-cargo-verus cargo-toml-root default-directory))
+         (verus-command (with-demoted-errors "Verus error: %S"
+                          (verus--run-on-crate-command))))
     (when verus-command
       (let ((compilation-command
              (mapconcat #'shell-quote-argument verus-command " ")))
@@ -476,8 +514,13 @@ If PREFIX is non-nil, then run ask for the command to run.
 
 If EXTRA-ARGS is non-nil, then add them to the command."
   (interactive "p")
-  (let ((verus-command (with-demoted-errors "Verus error: %S"
-                         (verus--run-on-file-command))))
+  (let* ((file (buffer-file-name))
+         (cargo-toml-root (when file (locate-dominating-file (f-dirname file) "Cargo.toml")))
+         (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
+         (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml)))
+         (default-directory (if use-cargo-verus cargo-toml-root default-directory))
+         (verus-command (with-demoted-errors "Verus error: %S"
+                          (verus--run-on-file-command))))
     (when verus-command
       (let ((compilation-command
              (mapconcat #'shell-quote-argument
@@ -547,6 +590,33 @@ If PREFIX is non-nil, then confirm command to run before running it."
 
 ;;; Flycheck setup
 
+(flycheck-define-checker verus-cargo
+  "A Verus syntax checker using cargo verus verify."
+  :command ("cargo"
+            "verus"
+            "verify"
+            "--message-format=short"
+            "--"
+            (eval
+             (let ((args (nthcdr 4 (verus--run-on-file-command))))
+               (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
+            "--expand-errors")
+  :error-patterns
+  ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
+   (error (file-name) ":" line ":" column ": error: " (message) line-end)
+   (warning (file-name) ":" line ":" column ": warning[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
+   (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
+   (info (file-name) ":" line ":" column ": note: " (message) line-end))
+  :working-directory (lambda (checker)
+                       (locate-dominating-file default-directory "Cargo.toml"))
+  :predicate (lambda ()
+               (and
+                (flycheck-buffer-saved-p)
+                (verus--is-verus-file)
+                (when-let ((root (locate-dominating-file default-directory "Cargo.toml")))
+                  (verus--is-cargo-verus-project-p (f-join root "Cargo.toml")))))
+  :modes verus-mode)
+
 (flycheck-define-checker verus
   "A Verus syntax checker using the Verus compiler."
   :command ("rust-verify.sh"
@@ -564,13 +634,16 @@ If PREFIX is non-nil, then confirm command to run before running it."
   :predicate (lambda ()
                (and
                 (flycheck-buffer-saved-p)
-                (verus--is-verus-file)))
+                (verus--is-verus-file)
+                (not (when-let ((root (locate-dominating-file default-directory "Cargo.toml")))
+                       (verus--is-cargo-verus-project-p (f-join root "Cargo.toml"))))))
   :modes verus-mode)
 
 (defun verus--flycheck-setup ()
   "Setup Flycheck for Verus."
-  (setq flycheck-verus-executable verus--rust-verify)
-  (add-to-list 'flycheck-checkers 'verus))
+  (add-to-list 'flycheck-checkers 'verus-cargo)
+  (add-to-list 'flycheck-checkers 'verus)
+  (setq flycheck-verus-executable verus--rust-verify))
 
 ;;; Automatic version checking
 
