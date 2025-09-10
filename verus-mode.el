@@ -570,11 +570,11 @@ If PREFIX is non-nil, then confirm command to run before running it."
   :command ("cargo"
             "verus"
             "verify"
+            "--message-format=short"
             "--"
             (eval
-             (let ((args (cdr (verus--run-on-file-command))))
+             (let ((args (nthcdr 4 (verus--run-on-file-command))))
                (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
-            "--error-format=short"
             "--expand-errors")
   :error-patterns
   ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
