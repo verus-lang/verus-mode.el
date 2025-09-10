@@ -582,6 +582,8 @@ If PREFIX is non-nil, then confirm command to run before running it."
    (warning (file-name) ":" line ":" column ": warning[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
    (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
    (info (file-name) ":" line ":" column ": note: " (message) line-end))
+  :working-directory (lambda (checker)
+                       (locate-dominating-file default-directory "Cargo.toml"))
   :predicate (lambda ()
                (and
                 (flycheck-buffer-saved-p)
