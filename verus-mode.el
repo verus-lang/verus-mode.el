@@ -280,7 +280,10 @@ show up in Verus files."
      ;; Or if none exist, then see if we have extra args specified in the
      ;; Cargo.toml, which indicates that the files in the directory should be
      ;; marked as Verus files.
-     (verus--extra-args-from-cargo-toml))))
+     (verus--extra-args-from-cargo-toml)
+     ;; Or check if this is a cargo-verus project
+     (when-let ((root (locate-dominating-file default-directory "Cargo.toml")))
+       (verus--is-cargo-verus-project-p (f-join root "Cargo.toml"))))))
 
 (defun verus--is-main-file ()
   "Return non-nil if the current buffer is a Verus main file.
