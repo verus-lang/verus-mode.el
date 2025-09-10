@@ -41,14 +41,22 @@ respectively.
 
 ## Extra Arguments Support
 
-To pass extra arguments to Verus, either use `C-u` before using any of the above
-"Run Verus" commands, or add a new table to the `Cargo.toml` for your Verus
-project to have it automatically picked up:
+To pass extra arguments to Verus, you can either use `C-u` prefixes (see details
+below) or you can add a new table to the `Cargo.toml` for your Verus project to
+have extra arguments automatically picked up:
 
 ``` toml
 [package.metadata.verus.ide]
 extra_args = "......"
 ```
+
+`C-u` prefixes to the "Run Verus" commands above work by allowing you to edit
+the command being run. Such modifications are remembered within the buffer, so
+you then no longer need to keep using the `C-u` prefix. So for example, you can
+run `C-u C-c C-c C-c`, add some extra arguments, and hit `RET`. Then, within
+that buffer, `C-c C-c C-c` will always use the updated command. If you want to
+reset back to the default command, just prefix with `C-u C-u` (i.e., prefix it
+twice, example `C-u C-u C-c C-c C-c`).
 
 ## Real-time verification
 

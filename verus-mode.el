@@ -208,6 +208,38 @@ removed at any time."
 (defvar-local verus--old-lsp-server rustic-lsp-server)
 (defvar-local verus--old-rutic-analyzer-command rustic-analyzer-command)
 (defvar-local verus--rust-verify nil)
+(defvar-local verus--custom-file-command nil)
+(defvar-local verus--custom-crate-command nil)
+
+(defun verus--get-compilation-command-with-persistence (prefix custom-command-var default-command)
+  "Get compilation command with persistence logic for Verus commands.
+
+PREFIX is the universal argument prefix.
+CUSTOM-COMMAND-VAR is the symbol for the buffer-local custom command variable.
+DEFAULT-COMMAND is the default command string to use.
+
+Returns the command string to execute."
+  (let* ((custom-command (symbol-value custom-command-var))
+         (compilation-command
+          (cond
+           ;; Reset to default command with C-u C-u prefix
+           ((= prefix 16)
+            (set custom-command-var nil)
+            default-command)
+           ;; Use custom command if it exists and no prefix given
+           ((and (= prefix 1) custom-command)
+            custom-command)
+           ;; Use default command if no prefix given and no custom command
+           ((= prefix 1)
+            default-command)
+           ;; Ask for command with prefix, using custom or default as initial value
+           (t
+            (let ((initial-command (or custom-command default-command)))
+              (read-shell-command "Run Verus: " initial-command))))))
+    ;; Store custom command (but not for C-u C-u reset)
+    (when (and (/= prefix 1) (/= prefix 16))
+      (set custom-command-var compilation-command))
+    compilation-command))
 
 (defun verus--setup ()
   "Setup Verus mode."
@@ -491,7 +523,12 @@ buffer visiting the file, otherwise throws an error."
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
 
-If PREFIX is non-nil, then run ask for the command to run."
+\\<verus-mode-map>
+With \\[universal-argument] \\[verus-run-on-crate], ask for the command to run and remember it.
+With \\[universal-argument] \\[universal-argument] \\[verus-run-on-crate], reset to default command.
+With no prefix, use remembered command or default.
+
+PREFIX controls the behavior as described above."
   (interactive "p")
   (let* ((file (buffer-file-name))
          (cargo-toml-root (when file (locate-dominating-file (f-dirname file) "Cargo.toml")))
@@ -501,17 +538,20 @@ If PREFIX is non-nil, then run ask for the command to run."
          (verus-command (with-demoted-errors "Verus error: %S"
                           (verus--run-on-crate-command))))
     (when verus-command
-      (let ((compilation-command
+      (let ((default-compilation-command
              (mapconcat #'shell-quote-argument verus-command " ")))
-        (compile (if (= prefix 1)
-                     compilation-command
-                   (read-shell-command "Run Verus: " compilation-command)))))))
+        (compile (verus--get-compilation-command-with-persistence
+                  prefix 'verus--custom-crate-command default-compilation-command))))))
 
 (defun verus-run-on-file (prefix &optional extra-args)
   "Run Verus on the current file.
 
-If PREFIX is non-nil, then run ask for the command to run.
+\\<verus-mode-map>
+With \\[universal-argument] \\[verus-run-on-file], ask for the command to run and remember it.
+With \\[universal-argument] \\[universal-argument] \\[verus-run-on-file], reset to default command.
+With no prefix, use remembered command or default.
 
+PREFIX controls the behavior as described above.
 If EXTRA-ARGS is non-nil, then add them to the command."
   (interactive "p")
   (let* ((file (buffer-file-name))
@@ -522,13 +562,12 @@ If EXTRA-ARGS is non-nil, then add them to the command."
          (verus-command (with-demoted-errors "Verus error: %S"
                           (verus--run-on-file-command))))
     (when verus-command
-      (let ((compilation-command
+      (let ((default-compilation-command
              (mapconcat #'shell-quote-argument
                         (append verus-command extra-args)
                         " ")))
-        (compile (if (= prefix 1)
-                     compilation-command
-                   (read-shell-command "Run Verus: " compilation-command)))))))
+        (compile (verus--get-compilation-command-with-persistence
+                  prefix 'verus--custom-file-command default-compilation-command))))))
 
 (defun verus-run-on-file-with-profiling (prefix)
   "Run Verus on the current file, with profiling enabled.
