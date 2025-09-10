@@ -214,7 +214,8 @@ removed at any time."
   (when (and (require 'toml nil 'noerror)
              (not (fboundp 'toml:read-literal-string)))
     (message (concat "Your toml.el package is outdated and may cause errors "
-                     "when reading Cargo.toml configuration.  Update with: "
+                     "when reading Cargo.toml configuration.  Depending on your Emacs setup, "
+                     "you might be able to update with: "
                      "M-x package-refresh-contents then M-x package-install RET toml")))
   (if (not verus-home)
       (setq verus-home (getenv "VERUS_HOME")))
