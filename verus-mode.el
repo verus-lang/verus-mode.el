@@ -438,13 +438,14 @@ buffer visiting the file, otherwise throws an error."
       (error "Buffer is not visiting a file. Cannot run Verus"))
     (let* ((default-directory (f-dirname file))
            (crate-root (verus--crate-root-file))
-           (cargo-toml (when-let ((root (locate-dominating-file default-directory "Cargo.toml")))
-                         (f-join root "Cargo.toml")))
+           (cargo-toml-root (locate-dominating-file default-directory "Cargo.toml"))
+           (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
            (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml))))
       (if use-cargo-verus
-          (verus--cargo-verus-command
-           ;; TODO(jayb): Should we actually also be passing the `verus--extra-args-from-cargo-toml' here?
-           nil)
+          (let ((default-directory cargo-toml-root))
+            (verus--cargo-verus-command
+             ;; TODO(jayb): Should we actually also be passing the `verus--extra-args-from-cargo-toml' here?
+             nil))
         (append
          (list verus--rust-verify)
          (if (string-suffix-p "lib.rs" crate-root)
@@ -495,8 +496,13 @@ buffer visiting the file, otherwise throws an error."
 
 If PREFIX is non-nil, then run ask for the command to run."
   (interactive "p")
-  (let ((verus-command (with-demoted-errors "Verus error: %S"
-                         (verus--run-on-crate-command))))
+  (let* ((file (buffer-file-name))
+         (cargo-toml-root (when file (locate-dominating-file (f-dirname file) "Cargo.toml")))
+         (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
+         (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml)))
+         (default-directory (if use-cargo-verus cargo-toml-root default-directory))
+         (verus-command (with-demoted-errors "Verus error: %S"
+                          (verus--run-on-crate-command))))
     (when verus-command
       (let ((compilation-command
              (mapconcat #'shell-quote-argument verus-command " ")))
@@ -511,8 +517,13 @@ If PREFIX is non-nil, then run ask for the command to run.
 
 If EXTRA-ARGS is non-nil, then add them to the command."
   (interactive "p")
-  (let ((verus-command (with-demoted-errors "Verus error: %S"
-                         (verus--run-on-file-command))))
+  (let* ((file (buffer-file-name))
+         (cargo-toml-root (when file (locate-dominating-file (f-dirname file) "Cargo.toml")))
+         (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
+         (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml)))
+         (default-directory (if use-cargo-verus cargo-toml-root default-directory))
+         (verus-command (with-demoted-errors "Verus error: %S"
+                          (verus--run-on-file-command))))
     (when verus-command
       (let ((compilation-command
              (mapconcat #'shell-quote-argument
