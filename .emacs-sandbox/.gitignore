@@ -2,3 +2,4 @@ elpa
 verus-home
 .verus-mode.el-last-version-check
 eln-cache/
+tree-sitter/

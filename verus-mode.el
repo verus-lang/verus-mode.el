@@ -6,7 +6,7 @@
 
 ;; Created: 13 Feb 2023
 ;; Version: 0.7.1
-;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (toml "0.0.1"))
+;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (tomlparse "1.0.0"))
 ;; Keywords: convenience, languages
 
 ;; This file is not part of GNU Emacs.
@@ -34,7 +34,54 @@
 (require 'f)
 (require 'flycheck)
 (require 'dumb-jump)
-(require 'toml)
+(require 'tomlparse)
+
+;;; TOML tree-sitter setup
+
+(defun verus--ensure-toml-grammar ()
+  "Ensure TOML tree-sitter grammar is installed for tomlparse.
+Warns the user if tree-sitter is not available or if installation fails."
+  (cond
+   ;; Check if tree-sitter functions are available (Emacs 29+)
+   ((not (and (fboundp 'treesit-available-p)
+              (fboundp 'treesit-language-available-p)
+              (fboundp 'treesit-install-language-grammar)))
+    (display-warning
+     'verus-mode
+     (concat "Tree-sitter functions are not available. "
+             "You may need Emacs 29 or later with tree-sitter support enabled. "
+             "TOML parsing features may not work correctly. "
+             "See https://www.masteringemacs.org/article/how-to-get-started-tree-sitter")
+     :warning))
+   ;; Check if tree-sitter is actually available on the system
+   ((not (treesit-available-p))
+    (display-warning
+     'verus-mode
+     (concat "Tree-sitter is not available on your system. "
+             "You may need to install libtree-sitter or compile Emacs with tree-sitter support. "
+             "TOML parsing features may not work correctly. "
+             "See https://www.masteringemacs.org/article/how-to-get-started-tree-sitter")
+     :warning))
+   ;; Tree-sitter is available, check if TOML grammar is installed
+   ((not (treesit-language-available-p 'toml))
+    ;; Add TOML recipe to treesit-language-source-alist if not already present
+    (unless (assoc 'toml treesit-language-source-alist)
+      (add-to-list 'treesit-language-source-alist
+                   '(toml "https://github.com/tree-sitter/tree-sitter-toml")))
+    (condition-case err
+        (progn
+          (message "verus-mode.el: Installing TOML tree-sitter grammar...")
+          (treesit-install-language-grammar 'toml)
+          (message "verus-mode.el: TOML tree-sitter grammar installed successfully."))
+      (error
+       (display-warning
+        'verus-mode
+        (format (concat "Failed to install TOML tree-sitter grammar: %s\n"
+                        "TOML parsing features may not work correctly. "
+                        "You may need to install it manually. "
+                        "See https://github.com/johannes-mueller/tomlparse.el")
+                (error-message-string err))
+        :warning))))))
 
 ;;; Customization
 
@@ -211,12 +258,6 @@ removed at any time."
 
 (defun verus--setup ()
   "Setup Verus mode."
-  (when (and (require 'toml nil 'noerror)
-             (not (fboundp 'toml:read-literal-string)))
-    (message (concat "Your toml.el package is outdated and may cause errors "
-                     "when reading Cargo.toml configuration.  Depending on your Emacs setup, "
-                     "you might be able to update with: "
-                     "M-x package-refresh-contents then M-x package-install RET toml")))
   (if (not verus-home)
       (setq verus-home (getenv "VERUS_HOME")))
   (if (or (not verus-home) (not (file-exists-p verus-home)))
@@ -249,6 +290,7 @@ removed at any time."
           (setq-local rustic-analyzer-command analyzer)))))
   ;; TEMPORARY FIXME: Disable format-on-save until we have verusfmt
   (setq-local rustic-format-on-save nil)
+  (verus--ensure-toml-grammar)
   (verus--syntax-highlight)
   (verus--compilation-mode-setup)
   (verus--prettify-symbols-setup)
@@ -370,11 +412,11 @@ This is done by checking if the file contains a `fn main` function."
 A project is cargo-verus-supported if its Cargo.toml contains
 package.metadata.verus.verify as true."
   (when (and toml-file (file-exists-p toml-file))
-    (let* ((toml (toml:read-from-file toml-file))
-           (package (cdr (assoc "package" toml)))
-           (metadata (cdr (assoc "metadata" package)))
-           (verus (cdr (assoc "verus" metadata)))
-           (verify (cdr (assoc "verify" verus))))
+    (let* ((toml (tomlparse-file toml-file :object-type 'alist))
+           (package (cdr (assoc 'package toml)))
+           (metadata (cdr (assoc 'metadata package)))
+           (verus (cdr (assoc 'verus metadata)))
+           (verify (cdr (assoc 'verify verus))))
       (and verify (eq verify t)))))
 
 (defun verus--extract-extra-args-from (toml-file)
@@ -386,12 +428,12 @@ package.metadata.verus.verify as true."
            (insert-file-contents toml-file)
            (goto-char (point-min))
            (search-forward "verus" nil t)))
-    (let* ((toml (toml:read-from-file toml-file))
-           (package (cdr (assoc "package" toml)))
-           (metadata (cdr (assoc "metadata" package)))
-           (verus (cdr (assoc "verus" metadata)))
-           (ide (cdr (assoc "ide" verus)))
-           (extra-args (cdr (assoc "extra_args" ide))))
+    (let* ((toml (tomlparse-file toml-file :object-type 'alist))
+           (package (cdr (assoc 'package toml)))
+           (metadata (cdr (assoc 'metadata package)))
+           (verus (cdr (assoc 'verus metadata)))
+           (ide (cdr (assoc 'ide verus)))
+           (extra-args (cdr (assoc 'extra_args ide))))
       extra-args)))
 
 (defun verus--path-shift-relative (path old new)
