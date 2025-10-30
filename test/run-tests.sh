@@ -28,6 +28,14 @@ if [ -n "$INTERACTIVE" ]; then
 fi
 echo ""
 
+# Either one of VERUS_HOME or .emacs-sandbox/verus-home should exist; we initialize the file (later) if the latter is missing
+if [ -z "$VERUS_HOME" ] && [ -f "$PROJECT_ROOT/.emacs-sandbox/verus-home" ]; then
+    VERUS_HOME="$(cat "$PROJECT_ROOT/.emacs-sandbox/verus-home")"
+    export VERUS_HOME
+    echo -e "Using VERUS_HOME from sandbox file: ${GREEN}$VERUS_HOME${NC}"
+    echo ""
+fi
+
 # Check for VERUS_HOME
 if [ -z "$VERUS_HOME" ]; then
     echo -e "${RED}ERROR: VERUS_HOME is not set${NC}"
@@ -51,6 +59,11 @@ if [ ! -d "$SANDBOX_DIR" ]; then
     echo -e "${YELLOW}Sandbox directory doesn't exist, creating it...${NC}"
     echo "Note: Run 'just emacs-sandbox' first to set up dependencies if tests fail"
     mkdir -p "$SANDBOX_DIR"
+fi
+
+if [ ! -f "$SANDBOX_DIR/verus-home" ]; then
+    echo -e "${YELLOW}Creating verus-home file in sandbox...${NC}"
+    echo "$VERUS_HOME" >"$SANDBOX_DIR/verus-home"
 fi
 
 echo "Using sandbox: $SANDBOX_DIR"
@@ -95,6 +108,13 @@ else
     else
         EMACS_ARGS+=(-f ert-run-tests-batch-and-exit)
     fi
+fi
+
+if [ ! -f "$PROJECT_ROOT/.bin/with-emacs.sh" ]; then
+    echo -e "${YELLOW}with-emacs.sh not found, downloading...${NC}"
+    mkdir -p "$PROJECT_ROOT/.bin"
+    wget https://raw.githubusercontent.com/alphapapa/with-emacs.sh/0bc4f216ed101d86d2e5d52919bad39bc041bdbe/with-emacs.sh -O "$PROJECT_ROOT/.bin/with-emacs.sh"
+    chmod +x "$PROJECT_ROOT/.bin/with-emacs.sh"
 fi
 
 "$PROJECT_ROOT/.bin/with-emacs.sh" \
