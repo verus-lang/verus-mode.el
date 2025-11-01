@@ -1,0 +1,80 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, dev, ci-test]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      EMACS_VERSION: "30.1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download latest Verus release
+        run: |
+          cd ~
+          # Get the latest release URL
+          LATEST_RELEASE=$(curl -s https://api.github.com/repos/verus-lang/verus/releases/latest | grep "browser_download_url.*linux" | cut -d '"' -f 4)
+          echo "Downloading Verus from: $LATEST_RELEASE"
+          curl -L "$LATEST_RELEASE" -o verus-linux.zip
+          unzip verus-linux.zip -d verus
+          mv verus/verus-x86-linux verus/release
+          mv verus target-verus
+          mkdir -p verus/source
+          mv target-verus verus/source/
+
+      - name: Install Rust version corresponding to Verus
+        run: |
+          rustup install $(strings $HOME/verus/source/target-verus/release/cargo-verus | awk '/rustc version/{print $3}')-x86_64-unknown-linux-gnu
+
+      - name: Set up environment
+        run: |
+          # Set VERUS_HOME
+          echo "VERUS_HOME=$HOME/verus" >> $GITHUB_ENV
+          # Set up PATH to include Verus binaries
+          echo "$HOME/verus/source/target-verus/release" >> "$GITHUB_PATH"
+
+      - name: Install just
+        uses: extractions/setup-just@v2
+
+      - name: Set up Emacs
+        uses: purcell/setup-emacs@master
+        with:
+          version: ${{ env.EMACS_VERSION }}
+
+      - name: Cache Emacs sandbox
+        id: cache-emacs-sandbox
+        uses: actions/cache@v4
+        with:
+          path: .emacs-sandbox
+          key: emacs-sandbox-${{ runner.os }}-emacs-${{ env.EMACS_VERSION }}-${{ hashFiles('verus-mode.el') }}
+          restore-keys: |
+            emacs-sandbox-${{ runner.os }}-emacs-${{ env.EMACS_VERSION }}-
+
+      - name: Cache crate targets
+        uses: actions/cache@v4
+        with:
+          path: verus-examples/cv-crate/target
+          key: emacs-sandbox-${{ runner.os }}-emacs-${{ env.EMACS_VERSION }}-${{ hashFiles('verus-examples/cv-crate/**/*.rs') }}
+          restore-keys: |
+            emacs-sandbox-${{ runner.os }}-emacs-${{ env.EMACS_VERSION }}-
+
+      - name: Pre-initialize the verus-examples cargo-verus invocations
+        run: |
+          (cd verus-examples/cv-crate && cargo verus verify)
+
+      - name: Install tree-sitter build dependencies
+        if: steps.cache-emacs-sandbox.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Run tests
+        run: |
+          just test

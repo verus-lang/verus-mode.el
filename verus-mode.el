@@ -6,7 +6,7 @@
 
 ;; Created: 13 Feb 2023
 ;; Version: 0.7.1
-;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (toml "0.0.1"))
+;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (tomlparse "1.0.0"))
 ;; Keywords: convenience, languages
 
 ;; This file is not part of GNU Emacs.
@@ -34,7 +34,68 @@
 (require 'f)
 (require 'flycheck)
 (require 'dumb-jump)
-(require 'toml)
+(require 'tomlparse)
+
+;;; TOML tree-sitter setup
+
+(defun verus--ensure-toml-grammar ()
+  "Ensure TOML tree-sitter grammar is installed for tomlparse.
+Warns the user if tree-sitter is not available or if installation fails."
+  (cond
+   ;; Check if tree-sitter functions are available (Emacs 29+)
+   ((not (and (fboundp 'treesit-available-p)
+              (fboundp 'treesit-language-available-p)
+              (fboundp 'treesit-install-language-grammar)))
+    (display-warning
+     'verus-mode
+     (concat "Tree-sitter functions are not available. "
+             "You may need Emacs 29 or later with tree-sitter support enabled. "
+             "TOML parsing features may not work correctly. "
+             "See https://www.masteringemacs.org/article/how-to-get-started-tree-sitter")
+     :warning))
+   ;; Check if tree-sitter is actually available on the system
+   ((not (treesit-available-p))
+    (display-warning
+     'verus-mode
+     (concat "Tree-sitter is not available on your system. "
+             "You may need to install libtree-sitter or compile Emacs with tree-sitter support. "
+             "TOML parsing features may not work correctly. "
+             "See https://www.masteringemacs.org/article/how-to-get-started-tree-sitter")
+     :warning))
+   ;; Tree-sitter is available, check if TOML grammar is installed
+   ((not (treesit-language-available-p 'toml))
+    ;; Add TOML recipe to treesit-language-source-alist if not already present
+    (unless (assoc 'toml treesit-language-source-alist)
+      (add-to-list 'treesit-language-source-alist
+                   '(toml "https://github.com/tree-sitter/tree-sitter-toml")))
+    (condition-case err
+        (progn
+          (message "verus-mode.el: Installing TOML tree-sitter grammar...")
+          (treesit-install-language-grammar 'toml)
+          (message "verus-mode.el: TOML tree-sitter grammar installed successfully."))
+      (error
+       ;; Installation failed - check if it's due to missing C compiler
+       (if (not (executable-find "cc"))
+           ;; No C compiler available - provide manual installation instructions
+           (display-warning
+            'verus-mode
+            (concat "Failed to install TOML tree-sitter grammar (no C compiler `cc` detected; you might be on Windows?).\n"
+                    "To install the TOML grammar manually:\n"
+                    "1. Download toml.dll from https://github.com/emacs-tree-sitter/tree-sitter-langs/releases\n"
+                    "2. Create the directory: " (f-join user-emacs-directory "tree-sitter") "\n"
+                    "3. Move toml.dll to: " (f-join user-emacs-directory "tree-sitter" "libtree-sitter-toml.dll") "\n"
+                    "4. Restart Emacs\n"
+                    "TOML parsing features may not work correctly until this is done.")
+            :warning)
+         ;; C compiler is available but installation still failed - rethrow
+         (display-warning
+          'verus-mode
+          (format (concat "Failed to install TOML tree-sitter grammar: %s\n"
+                          "TOML parsing features may not work correctly. "
+                          "You may need to install it manually. "
+                          "See https://github.com/johannes-mueller/tomlparse.el")
+                  (error-message-string err))
+          :warning)))))))
 
 ;;; Customization
 
@@ -211,12 +272,6 @@ removed at any time."
 
 (defun verus--setup ()
   "Setup Verus mode."
-  (when (and (require 'toml nil 'noerror)
-             (not (fboundp 'toml:read-literal-string)))
-    (message (concat "Your toml.el package is outdated and may cause errors "
-                     "when reading Cargo.toml configuration.  Depending on your Emacs setup, "
-                     "you might be able to update with: "
-                     "M-x package-refresh-contents then M-x package-install RET toml")))
   (if (not verus-home)
       (setq verus-home (getenv "VERUS_HOME")))
   (if (or (not verus-home) (not (file-exists-p verus-home)))
@@ -249,6 +304,7 @@ removed at any time."
           (setq-local rustic-analyzer-command analyzer)))))
   ;; TEMPORARY FIXME: Disable format-on-save until we have verusfmt
   (setq-local rustic-format-on-save nil)
+  (verus--ensure-toml-grammar)
   (verus--syntax-highlight)
   (verus--compilation-mode-setup)
   (verus--prettify-symbols-setup)
@@ -370,12 +426,46 @@ This is done by checking if the file contains a `fn main` function."
 A project is cargo-verus-supported if its Cargo.toml contains
 package.metadata.verus.verify as true."
   (when (and toml-file (file-exists-p toml-file))
-    (let* ((toml (toml:read-from-file toml-file))
-           (package (cdr (assoc "package" toml)))
-           (metadata (cdr (assoc "metadata" package)))
-           (verus (cdr (assoc "verus" metadata)))
-           (verify (cdr (assoc "verify" verus))))
+    (let* ((toml (tomlparse-file toml-file :object-type 'alist))
+           (package (cdr (assoc 'package toml)))
+           (metadata (cdr (assoc 'metadata package)))
+           (verus (cdr (assoc 'verus metadata)))
+           (verify (cdr (assoc 'verify verus))))
       (and verify (eq verify t)))))
+
+(defun verus--is-workspace-root-p (toml-file)
+  "Check if TOML-FILE is a Cargo workspace root.
+A Cargo.toml is a workspace root if it contains a [workspace] section."
+  (when (and toml-file (file-exists-p toml-file))
+    (let* ((toml (tomlparse-file toml-file :object-type 'alist))
+           (workspace (assoc 'workspace toml)))
+      (not (null workspace)))))
+
+(defun verus--find-workspace-root (start-dir)
+  "Find the workspace root starting from START-DIR.
+Walks up the directory tree looking for a Cargo.toml with [workspace] section.
+Returns the directory containing the workspace root Cargo.toml, or nil if not found."
+  (when-let ((cargo-toml (locate-dominating-file start-dir "Cargo.toml")))
+    (let ((toml-path (f-join cargo-toml "Cargo.toml")))
+      (if (verus--is-workspace-root-p toml-path)
+          cargo-toml
+        ;; Not a workspace root, check parent directories
+        (let ((parent (f-parent cargo-toml)))
+          (when (and parent (not (string= parent cargo-toml)))
+            (verus--find-workspace-root parent)))))))
+
+(defun verus--get-cargo-verus-root-directory ()
+  "Get the root directory for running cargo verus commands.
+For workspace members, returns the workspace root directory.
+For standalone packages, returns the package root directory.
+Returns nil if not in a cargo-verus project."
+  (when-let* ((file (or (buffer-file-name) default-directory))
+              (cargo-toml-root (locate-dominating-file (if (file-directory-p file) file (f-dirname file)) "Cargo.toml"))
+              (cargo-toml (f-join cargo-toml-root "Cargo.toml")))
+    (when (verus--is-cargo-verus-project-p cargo-toml)
+      ;; This is a cargo-verus project, check if it's in a workspace
+      (or (verus--find-workspace-root cargo-toml-root)
+          cargo-toml-root))))
 
 (defun verus--extract-extra-args-from (toml-file)
   "Extract the `package.metadata.verus.ide.extra_args' string from the TOML-FILE."
@@ -386,12 +476,12 @@ package.metadata.verus.verify as true."
            (insert-file-contents toml-file)
            (goto-char (point-min))
            (search-forward "verus" nil t)))
-    (let* ((toml (toml:read-from-file toml-file))
-           (package (cdr (assoc "package" toml)))
-           (metadata (cdr (assoc "metadata" package)))
-           (verus (cdr (assoc "verus" metadata)))
-           (ide (cdr (assoc "ide" verus)))
-           (extra-args (cdr (assoc "extra_args" ide))))
+    (let* ((toml (tomlparse-file toml-file :object-type 'alist))
+           (package (cdr (assoc 'package toml)))
+           (metadata (cdr (assoc 'metadata package)))
+           (verus (cdr (assoc 'verus metadata)))
+           (ide (cdr (assoc 'ide verus)))
+           (extra-args (cdr (assoc 'extra_args ide))))
       extra-args)))
 
 (defun verus--path-shift-relative (path old new)
@@ -475,24 +565,27 @@ the path from the crate root file to the current buffer."
 
 Returns a list of command-line arguments. Expects to be run in a
 buffer visiting the file, otherwise throws an error."
-  (append
-   (verus--run-on-crate-command)
-   (cond
-    ((string= (buffer-file-name) (verus--crate-root-file))
-     (list "--verify-root"))
-    (t
-     (list "--verify-module" (verus--current-module-name))))))
+  (let ((file (buffer-file-name)))
+    (when (not file)
+      (error "Buffer is not visiting a file. Cannot run Verus"))
+    ;; Use the file's directory as default-directory for finding crate root,
+    ;; since the caller may have set default-directory to the workspace root
+    (let ((default-directory (f-dirname file)))
+      (append
+       (verus--run-on-crate-command)
+       (cond
+        ((string= file (verus--crate-root-file))
+         (list "--verify-root"))
+        (t
+         (list "--verify-module" (verus--current-module-name))))))))
 
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
 
 If PREFIX is non-nil, then run ask for the command to run."
   (interactive "p")
-  (let* ((file (buffer-file-name))
-         (cargo-toml-root (when file (locate-dominating-file (f-dirname file) "Cargo.toml")))
-         (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
-         (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml)))
-         (default-directory (if use-cargo-verus cargo-toml-root default-directory))
+  (let* ((cargo-verus-root (verus--get-cargo-verus-root-directory))
+         (default-directory (or cargo-verus-root default-directory))
          (verus-command (with-demoted-errors "Verus error: %S"
                           (verus--run-on-crate-command))))
     (when verus-command
@@ -509,11 +602,8 @@ If PREFIX is non-nil, then run ask for the command to run.
 
 If EXTRA-ARGS is non-nil, then add them to the command."
   (interactive "p")
-  (let* ((file (buffer-file-name))
-         (cargo-toml-root (when file (locate-dominating-file (f-dirname file) "Cargo.toml")))
-         (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
-         (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml)))
-         (default-directory (if use-cargo-verus cargo-toml-root default-directory))
+  (let* ((cargo-verus-root (verus--get-cargo-verus-root-directory))
+         (default-directory (or cargo-verus-root default-directory))
          (verus-command (with-demoted-errors "Verus error: %S"
                           (verus--run-on-file-command))))
     (when verus-command
@@ -603,13 +693,13 @@ If PREFIX is non-nil, then confirm command to run before running it."
    (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
    (info (file-name) ":" line ":" column ": note: " (message) line-end))
   :working-directory (lambda (checker)
-                       (locate-dominating-file default-directory "Cargo.toml"))
+                       (or (verus--get-cargo-verus-root-directory)
+                           default-directory))
   :predicate (lambda ()
                (and
                 (flycheck-buffer-saved-p)
                 (verus--is-verus-file)
-                (when-let ((root (locate-dominating-file default-directory "Cargo.toml")))
-                  (verus--is-cargo-verus-project-p (f-join root "Cargo.toml")))))
+                (verus--get-cargo-verus-root-directory)))
   :modes verus-mode)
 
 (flycheck-define-checker verus
