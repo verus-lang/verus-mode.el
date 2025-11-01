@@ -74,14 +74,28 @@ Warns the user if tree-sitter is not available or if installation fails."
           (treesit-install-language-grammar 'toml)
           (message "verus-mode.el: TOML tree-sitter grammar installed successfully."))
       (error
-       (display-warning
-        'verus-mode
-        (format (concat "Failed to install TOML tree-sitter grammar: %s\n"
-                        "TOML parsing features may not work correctly. "
-                        "You may need to install it manually. "
-                        "See https://github.com/johannes-mueller/tomlparse.el")
-                (error-message-string err))
-        :warning))))))
+       ;; Installation failed - check if it's due to missing C compiler
+       (if (not (executable-find "cc"))
+           ;; No C compiler available - provide manual installation instructions
+           (display-warning
+            'verus-mode
+            (concat "Failed to install TOML tree-sitter grammar (no C compiler `cc` detected; you might be on Windows?).\n"
+                    "To install the TOML grammar manually:\n"
+                    "1. Download toml.dll from https://github.com/emacs-tree-sitter/tree-sitter-langs/releases\n"
+                    "2. Create the directory: " (f-join user-emacs-directory "tree-sitter") "\n"
+                    "3. Move toml.dll to: " (f-join user-emacs-directory "tree-sitter" "libtree-sitter-toml.dll") "\n"
+                    "4. Restart Emacs\n"
+                    "TOML parsing features may not work correctly until this is done.")
+            :warning)
+         ;; C compiler is available but installation still failed - rethrow
+         (display-warning
+          'verus-mode
+          (format (concat "Failed to install TOML tree-sitter grammar: %s\n"
+                          "TOML parsing features may not work correctly. "
+                          "You may need to install it manually. "
+                          "See https://github.com/johannes-mueller/tomlparse.el")
+                  (error-message-string err))
+          :warning)))))))
 
 ;;; Customization
 
