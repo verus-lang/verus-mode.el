@@ -43,7 +43,13 @@
   (advice-add 'next-error :around
               (lambda (orig-fun &rest args)
                 (let ((inhibit-message t))
-                  (apply orig-fun args)))))
+                  (apply orig-fun args))))
+  ;; For read-file-name, throw an error, it should not be invoked in batch mode.
+  (advice-add 'read-file-name :around
+              (lambda (orig-fun &rest args)
+                (error (concat "read-file-name should not be called in batch mode. "
+                               "it means that the default-directory is not set correctly. "
+                               "thus verus-mode could not find the file path")))))
 
 ;;; Test Helpers
 
@@ -368,6 +374,118 @@
     (with-verus-file file
                      (let ((module-name (verus--current-module-name)))
                        (should (string= module-name "foo::bar"))))))
+
+;;; Workspace Tests
+
+(ert-deftest verus-integration-test-workspace-verify-file-success ()
+  "Test C-c C-c C-c on a file in a workspace that should verify successfully."
+  :tags '(integration slow verification workspace)
+  (skip-unless (and (getenv "VERUS_HOME")
+                    (file-exists-p (expand-file-name "cv-workspace/member1/src/submodule.rs" verus-test-examples-dir))))
+  (let ((file (expand-file-name "cv-workspace/member1/src/submodule.rs" verus-test-examples-dir)))
+    (with-verus-file file
+                     ;; Ensure file has correct content
+                     (goto-char (point-min))
+                     (when (search-forward "assert(2 == 3)" nil t)
+                       (replace-match "assert(2 == 1 + 1)")
+                       (save-buffer))
+
+                     ;; Wait for any existing compilation to finish, then kill buffer
+                     (when (get-buffer "*compilation*")
+                       (verus-test-wait-for-compilation)
+                       (kill-buffer "*compilation*"))
+
+                     ;; Run verification
+                     (verus-run-on-file 1)
+                     (verus-test-wait-for-compilation)
+
+                     ;; Check result
+                     (should (eq (verus-test-get-compilation-result) 'success))
+                     (should (get-buffer "*compilation*")))))
+
+(ert-deftest verus-integration-test-workspace-verify-with-error ()
+  "Test C-c C-c C-c on a workspace file with an error and verify navigation works."
+  :tags '(integration slow verification workspace navigation)
+  (skip-unless (and (getenv "VERUS_HOME")
+                    (file-exists-p (expand-file-name "cv-workspace/member1/src/submodule.rs" verus-test-examples-dir))))
+  (let ((file (expand-file-name "cv-workspace/member1/src/submodule.rs" verus-test-examples-dir)))
+    (with-verus-file file
+                     ;; Save original content
+                     (let ((original-content (buffer-string)))
+                       ;; Introduce an error at a known line
+                       (goto-char (point-min))
+                       (search-forward "assert(2 == 1 + 1)")
+                       (let ((error-line (line-number-at-pos)))
+                         (replace-match "assert(2 == 3)")
+                         (save-buffer)
+
+                         ;; Wait for any existing compilation to finish, then kill buffer
+                         (when (get-buffer "*compilation*")
+                           (verus-test-wait-for-compilation)
+                           (kill-buffer "*compilation*"))
+
+                         (unwind-protect
+                             (progn
+                               ;; Run verification
+                               (verus-run-on-file 1)
+                               (verus-test-wait-for-compilation)
+
+                               ;; Check that verification failed
+                               (should (eq (verus-test-get-compilation-result) 'failure))
+
+                               ;; Try to navigate to error
+                               (next-error)
+
+                               ;; Should be at the error location
+                               (should (= (line-number-at-pos) error-line)))
+
+                           ;; Restore file
+                           (erase-buffer)
+                           (insert original-content)
+                           (save-buffer)))))))
+
+(ert-deftest verus-integration-test-workspace-flycheck-error ()
+  "Test that flycheck works correctly in workspace files and C-c C-n navigates to errors."
+  :tags '(integration slow flycheck workspace navigation)
+  (skip-unless (and (getenv "VERUS_HOME")
+                    (file-exists-p (expand-file-name "cv-workspace/member1/src/submodule.rs" verus-test-examples-dir))))
+  (let ((file (expand-file-name "cv-workspace/member1/src/submodule.rs" verus-test-examples-dir)))
+    (with-verus-file file
+                     ;; Save original content
+                     (let ((original-content (buffer-string)))
+                       ;; Introduce an error
+                       (goto-char (point-min))
+                       (search-forward "assert(2 == 1 + 1)")
+                       (let ((error-line (line-number-at-pos)))
+                         (replace-match "assert(2 == 3)")
+                         (save-buffer)
+
+                         ;; Ensure flycheck is active
+                         (flycheck-mode 1)
+
+                         (unwind-protect
+                             (progn
+                               ;; Trigger flycheck
+                               (flycheck-buffer)
+                               (verus-test-wait-for-flycheck)
+
+                               ;; Check that errors were found
+                               (should (memq flycheck-last-status-change '(finished errored)))
+                               (should (> (length (flycheck-overlay-errors-in (point-min) (point-max))) 0))
+
+                               ;; Go to beginning of buffer
+                               (goto-char (point-min))
+
+                               ;; Navigate to error using C-c C-n
+                               (flycheck-next-error)
+
+                               ;; Should be near the error
+                               (should (<= (abs (- (line-number-at-pos) error-line)) 1)))
+
+                           ;; Restore file
+                           (erase-buffer)
+                           (insert original-content)
+                           (save-buffer)))))))
 
 ;;; Run All Integration Tests
 
