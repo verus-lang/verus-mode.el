@@ -60,14 +60,17 @@ jobs:
       - name: Cache crate targets
         uses: actions/cache@v4
         with:
-          path: verus-examples/cv-crate/target
-          key: emacs-sandbox-${{ runner.os }}-emacs-${{ env.EMACS_VERSION }}-${{ hashFiles('verus-examples/cv-crate/**/*.rs') }}
+          path: |
+            verus-examples/cv-crate/target
+            verus-examples/cv-workspace/target
+          key: emacs-sandbox-${{ runner.os }}-emacs-${{ env.EMACS_VERSION }}-${{ hashFiles('verus-examples/cv-crate/**/*.rs', 'verus-examples/cv-workspace/**/*.rs') }}
           restore-keys: |
             emacs-sandbox-${{ runner.os }}-emacs-${{ env.EMACS_VERSION }}-
 
       - name: Pre-initialize the verus-examples cargo-verus invocations
         run: |
           (cd verus-examples/cv-crate && cargo verus verify)
+          (cd verus-examples/cv-workspace && cargo verus verify)
 
       - name: Install tree-sitter build dependencies
         if: steps.cache-emacs-sandbox.outputs.cache-hit != 'true'
