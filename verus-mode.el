@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.8.0
+;; Version: 0.8.1
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (tomlparse "1.0.0"))
 ;; Keywords: convenience, languages
 
@@ -467,6 +467,21 @@ Returns nil if not in a cargo-verus project."
       (or (verus--find-workspace-root cargo-toml-root)
           cargo-toml-root))))
 
+(defun verus--is-in-cargo-verus-workspace ()
+  "Check if the current buffer is in a cargo-verus workspace.
+A workspace is different from a single crate - it has a workspace root
+that is different from the package root.
+Returns non-nil if in a workspace, nil otherwise.
+
+This exists entirely due to Verus#1938, and will be removed once that is resolved."
+  (when-let* ((file (or (buffer-file-name) default-directory))
+              (cargo-toml-root (locate-dominating-file (if (file-directory-p file) file (f-dirname file)) "Cargo.toml"))
+              (cargo-toml (f-join cargo-toml-root "Cargo.toml")))
+    (when (verus--is-cargo-verus-project-p cargo-toml)
+      ;; Check if there's a workspace root different from this crate
+      (when-let ((workspace-root (verus--find-workspace-root cargo-toml-root)))
+        (not (string= (f-canonical workspace-root) (f-canonical cargo-toml-root)))))))
+
 (defun verus--extract-extra-args-from (toml-file)
   "Extract the `package.metadata.verus.ide.extra_args' string from the TOML-FILE."
   (when (and
@@ -574,6 +589,8 @@ buffer visiting the file, otherwise throws an error."
       (append
        (verus--run-on-crate-command)
        (cond
+        ;; In workspace: skip subsetting arguments due to issue verus#1938
+        ((verus--is-in-cargo-verus-workspace) nil)
         ((string= file (verus--crate-root-file))
          (list "--verify-root"))
         (t
@@ -629,22 +646,26 @@ If PREFIX is non-nil, then enable `always profiling' mode."
 
 Returns a list of command-line arguments. If FUNCTION-NAME is nil,
 returns base command for manual function specification."
-  (let ((base-command (verus--run-on-crate-command))
-        (verify-args (cond
-                      ((string= (buffer-file-name) (verus--crate-root-file))
-                       (list "--verify-root"))
-                      ((verus--has-modules-in-file)
-                       (message "Warning: module detection for functions may not be fully accurate in a file that also has submodules.  If you get a failure in module detection, please file an issue at https://github.com/verus-lang/verus-mode.el/issues.")
-                       (list "--verify-only-module" (verus--current-module-name)))
-                      (t
-                       (list "--verify-only-module" (verus--current-module-name)))))
-        (function-args (if function-name
-                           (list "--verify-function"
-                                 (if verus-partial-verif-of-fn-is-starred
-                                     (concat "*" function-name "*")
-                                   function-name))
-                         (list "--verify-function"))))
-    (append base-command verify-args function-args)))
+  (let ((base-command (verus--run-on-crate-command)))
+    (if (verus--is-in-cargo-verus-workspace)
+        (progn
+          (message "Function/module subsetting is unsupported on workspace crates until https://github.com/verus-lang/verus/issues/1938 is resolved. Verifying entire workspace instead.")
+          base-command)
+      (let ((verify-args (cond
+                          ((string= (buffer-file-name) (verus--crate-root-file))
+                           (list "--verify-root"))
+                          ((verus--has-modules-in-file)
+                           (message "Warning: module detection for functions may not be fully accurate in a file that also has submodules.  If you get a failure in module detection, please file an issue at https://github.com/verus-lang/verus-mode.el/issues.")
+                           (list "--verify-only-module" (verus--current-module-name)))
+                          (t
+                           (list "--verify-only-module" (verus--current-module-name)))))
+            (function-args (if function-name
+                               (list "--verify-function"
+                                     (if verus-partial-verif-of-fn-is-starred
+                                         (concat "*" function-name "*")
+                                       function-name))
+                             (list "--verify-function"))))
+        (append base-command verify-args function-args)))))
 
 (defun verus-run-on-function-at-point (prefix)
   "Run Verus on the function at point.
