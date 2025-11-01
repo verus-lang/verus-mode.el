@@ -701,18 +701,14 @@ If PREFIX is non-nil, then confirm command to run before running it."
   :command ("cargo"
             "verus"
             "verify"
-            "--message-format=short"
+            "--message-format=json"
             "--"
             (eval
              (let ((args (nthcdr 4 (verus--run-on-file-command))))
                (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
             "--expand-errors")
-  :error-patterns
-  ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
-   (error (file-name) ":" line ":" column ": error: " (message) line-end)
-   (warning (file-name) ":" line ":" column ": warning[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
-   (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
-   (info (file-name) ":" line ":" column ": note: " (message) line-end))
+  :error-parser flycheck-parse-cargo-rustc
+  :error-filter flycheck-rust-error-filter
   :working-directory (lambda (checker)
                        (or (verus--get-cargo-verus-root-directory)
                            default-directory))
@@ -729,14 +725,10 @@ If PREFIX is non-nil, then confirm command to run before running it."
             (eval
              (let ((args (cdr (verus--run-on-file-command))))
                (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
-            "--error-format=short"
+            "--error-format=json"
             "--expand-errors")
-  :error-patterns
-  ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
-   (error (file-name) ":" line ":" column ": error: " (message) line-end)
-   (warning (file-name) ":" line ":" column ": warning[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
-   (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
-   (info (file-name) ":" line ":" column ": note: " (message) line-end))
+  :error-parser flycheck-parse-cargo-rustc
+  :error-filter flycheck-rust-error-filter
   :predicate (lambda ()
                (and
                 (flycheck-buffer-saved-p)
