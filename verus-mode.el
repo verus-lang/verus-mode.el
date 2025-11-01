@@ -419,6 +419,40 @@ package.metadata.verus.verify as true."
            (verify (cdr (assoc 'verify verus))))
       (and verify (eq verify t)))))
 
+(defun verus--is-workspace-root-p (toml-file)
+  "Check if TOML-FILE is a Cargo workspace root.
+A Cargo.toml is a workspace root if it contains a [workspace] section."
+  (when (and toml-file (file-exists-p toml-file))
+    (let* ((toml (tomlparse-file toml-file :object-type 'alist))
+           (workspace (assoc 'workspace toml)))
+      (not (null workspace)))))
+
+(defun verus--find-workspace-root (start-dir)
+  "Find the workspace root starting from START-DIR.
+Walks up the directory tree looking for a Cargo.toml with [workspace] section.
+Returns the directory containing the workspace root Cargo.toml, or nil if not found."
+  (when-let ((cargo-toml (locate-dominating-file start-dir "Cargo.toml")))
+    (let ((toml-path (f-join cargo-toml "Cargo.toml")))
+      (if (verus--is-workspace-root-p toml-path)
+          cargo-toml
+        ;; Not a workspace root, check parent directories
+        (let ((parent (f-parent cargo-toml)))
+          (when (and parent (not (string= parent cargo-toml)))
+            (verus--find-workspace-root parent)))))))
+
+(defun verus--get-cargo-verus-root-directory ()
+  "Get the root directory for running cargo verus commands.
+For workspace members, returns the workspace root directory.
+For standalone packages, returns the package root directory.
+Returns nil if not in a cargo-verus project."
+  (when-let* ((file (or (buffer-file-name) default-directory))
+              (cargo-toml-root (locate-dominating-file (if (file-directory-p file) file (f-dirname file)) "Cargo.toml"))
+              (cargo-toml (f-join cargo-toml-root "Cargo.toml")))
+    (when (verus--is-cargo-verus-project-p cargo-toml)
+      ;; This is a cargo-verus project, check if it's in a workspace
+      (or (verus--find-workspace-root cargo-toml-root)
+          cargo-toml-root))))
+
 (defun verus--extract-extra-args-from (toml-file)
   "Extract the `package.metadata.verus.ide.extra_args' string from the TOML-FILE."
   (when (and
@@ -517,24 +551,27 @@ the path from the crate root file to the current buffer."
 
 Returns a list of command-line arguments. Expects to be run in a
 buffer visiting the file, otherwise throws an error."
-  (append
-   (verus--run-on-crate-command)
-   (cond
-    ((string= (buffer-file-name) (verus--crate-root-file))
-     (list "--verify-root"))
-    (t
-     (list "--verify-module" (verus--current-module-name))))))
+  (let ((file (buffer-file-name)))
+    (when (not file)
+      (error "Buffer is not visiting a file. Cannot run Verus"))
+    ;; Use the file's directory as default-directory for finding crate root,
+    ;; since the caller may have set default-directory to the workspace root
+    (let ((default-directory (f-dirname file)))
+      (append
+       (verus--run-on-crate-command)
+       (cond
+        ((string= file (verus--crate-root-file))
+         (list "--verify-root"))
+        (t
+         (list "--verify-module" (verus--current-module-name))))))))
 
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
 
 If PREFIX is non-nil, then run ask for the command to run."
   (interactive "p")
-  (let* ((file (buffer-file-name))
-         (cargo-toml-root (when file (locate-dominating-file (f-dirname file) "Cargo.toml")))
-         (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
-         (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml)))
-         (default-directory (if use-cargo-verus cargo-toml-root default-directory))
+  (let* ((cargo-verus-root (verus--get-cargo-verus-root-directory))
+         (default-directory (or cargo-verus-root default-directory))
          (verus-command (with-demoted-errors "Verus error: %S"
                           (verus--run-on-crate-command))))
     (when verus-command
@@ -551,11 +588,8 @@ If PREFIX is non-nil, then run ask for the command to run.
 
 If EXTRA-ARGS is non-nil, then add them to the command."
   (interactive "p")
-  (let* ((file (buffer-file-name))
-         (cargo-toml-root (when file (locate-dominating-file (f-dirname file) "Cargo.toml")))
-         (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
-         (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml)))
-         (default-directory (if use-cargo-verus cargo-toml-root default-directory))
+  (let* ((cargo-verus-root (verus--get-cargo-verus-root-directory))
+         (default-directory (or cargo-verus-root default-directory))
          (verus-command (with-demoted-errors "Verus error: %S"
                           (verus--run-on-file-command))))
     (when verus-command
@@ -645,13 +679,13 @@ If PREFIX is non-nil, then confirm command to run before running it."
    (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
    (info (file-name) ":" line ":" column ": note: " (message) line-end))
   :working-directory (lambda (checker)
-                       (locate-dominating-file default-directory "Cargo.toml"))
+                       (or (verus--get-cargo-verus-root-directory)
+                           default-directory))
   :predicate (lambda ()
                (and
                 (flycheck-buffer-saved-p)
                 (verus--is-verus-file)
-                (when-let ((root (locate-dominating-file default-directory "Cargo.toml")))
-                  (verus--is-cargo-verus-project-p (f-join root "Cargo.toml")))))
+                (verus--get-cargo-verus-root-directory)))
   :modes verus-mode)
 
 (flycheck-define-checker verus
