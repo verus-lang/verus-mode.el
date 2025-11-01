@@ -78,23 +78,18 @@
       (error "Flycheck timeout after %d seconds" timeout))))
 
 (defun verus-test-get-compilation-result ()
-  "Get the result of the last compilation (success or failure)."
+  "Get the result of the last compilation (success or failure).
+Uses the compilation exit status which works for both single crates and workspaces."
   (when (get-buffer "*compilation*")
     (with-current-buffer "*compilation*"
-      (goto-char (point-min))
-      ;; Look for "verification results:: X verified, Y errors"
-      (let ((verification-line (re-search-forward "verification results::" nil t)))
-        (if verification-line
-            (progn
-              (beginning-of-line)
-              (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-                (if (string-match "\\([0-9]+\\) errors" line)
-                    (let ((error-count (string-to-number (match-string 1 line))))
-                      (if (> error-count 0)
-                          'failure
-                        'success))
-                  'unknown)))
-          'unknown)))))
+      (goto-char (point-max))
+      ;; Look for compilation exit status at the end of the buffer
+      (cond
+       ((re-search-backward "Compilation finished" nil t)
+        'success)
+       ((re-search-backward "Compilation exited abnormally with code" nil t)
+        'failure)
+       (t 'unknown)))))
 
 (defun verus-test-compilation-has-error-at (file line)
   "Check if compilation buffer has an error at FILE:LINE."
