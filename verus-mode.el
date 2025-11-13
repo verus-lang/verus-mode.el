@@ -527,10 +527,23 @@ ones are relative to the Cargo.toml)."
                               (verus--path-shift-relative last root cwd))
                     arg))) args))))
 
-(defun verus--cargo-verus-command (args)
+(defun verus--get-package-name (toml-file)
+  "Extract the package name from TOML-FILE (Cargo.toml).
+Returns the package name as a string, or nil if not found."
+  (when (and toml-file (file-exists-p toml-file))
+    (let* ((toml (tomlparse-file toml-file :object-type 'alist))
+           (package (cdr (assoc 'package toml)))
+           (name (cdr (assoc 'name package))))
+      name)))
+
+(defun verus--cargo-verus-command (args &optional package)
   "Build cargo-verus command with ARGS.
+If PACKAGE is non-nil, adds -p PACKAGE to target a specific workspace member.
 Returns a list of command-line arguments for cargo verus verify."
-  (append (list "cargo" "verus" "verify" "--") args))
+  (append (list "cargo" "verus" "verify")
+          (when package (list "-p" package))
+          (list "--")
+          args))
 
 (defun verus--run-on-crate-command ()
   "Return the command to run Verus on the current crate.
@@ -546,10 +559,15 @@ buffer visiting the file, otherwise throws an error."
            (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
            (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml))))
       (if use-cargo-verus
-          (let ((default-directory cargo-toml-root))
+          (let* ((default-directory cargo-toml-root)
+                 (workspace-root (verus--find-workspace-root cargo-toml-root))
+                 ;; If in a workspace, get the package name from the current crate's Cargo.toml
+                 (package-name (when workspace-root
+                                 (verus--get-package-name cargo-toml))))
             (verus--cargo-verus-command
              ;; TODO(jayb): Should we actually also be passing the `verus--extra-args-from-cargo-toml' here?
-             nil))
+             nil
+             package-name))
         (append
          (list verus--rust-verify)
          (if (string-suffix-p "lib.rs" crate-root)
@@ -702,9 +720,21 @@ If PREFIX is non-nil, then confirm command to run before running it."
             "verus"
             "verify"
             "--message-format=json"
+            (eval
+             ;; Extract -p flag and package name if present
+             (let* ((full-cmd (verus--run-on-file-command))
+                    (dash-dash-pos (cl-position "--" full-cmd :test #'string=))
+                    ;; Get everything between "verify" and "--"
+                    (cargo-flags (when dash-dash-pos
+                                   (cl-subseq full-cmd 3 dash-dash-pos))))
+               cargo-flags))
             "--"
             (eval
-             (let ((args (nthcdr 4 (verus--run-on-file-command))))
+             ;; Get verus arguments (everything after "--")
+             (let* ((full-cmd (verus--run-on-file-command))
+                    (dash-dash-pos (cl-position "--" full-cmd :test #'string=))
+                    (args (when dash-dash-pos
+                            (nthcdr (1+ dash-dash-pos) full-cmd))))
                (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
             "--expand-errors")
   :error-parser flycheck-parse-cargo-rustc
