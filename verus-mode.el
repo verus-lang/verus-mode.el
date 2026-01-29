@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.9.0
+;; Version: 0.9.1
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (tomlparse "1.0.0"))
 ;; Keywords: convenience, languages
 
@@ -690,10 +690,12 @@ returns base command for manual function specification."
 
 If PREFIX is non-nil, then confirm command to run before running it."
   (interactive "p")
-  (let ((function-name
-         (save-excursion
-           (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)[<(]" nil t)
-             (match-string 1)))))
+  (let* ((cargo-verus-root (verus--get-cargo-verus-root-directory))
+         (default-directory (or cargo-verus-root default-directory))
+         (function-name
+          (save-excursion
+            (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)[<(]" nil t)
+              (match-string 1)))))
     (if function-name
         (let ((verus-command (with-demoted-errors "Verus error: %S"
                                (verus--run-on-function-command function-name))))

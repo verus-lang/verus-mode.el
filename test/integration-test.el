@@ -174,6 +174,140 @@ Uses the compilation exit status which works for both single crates and workspac
                      (should (eq (verus-test-get-compilation-result) 'success))
                      (should (get-buffer "*compilation*")))))
 
+;;; Verification Tests - C-c C-c C-f (verus-run-on-function-at-point)
+
+(ert-deftest verus-integration-test-verify-function-success ()
+  "Test C-c C-c C-f on a function that should verify successfully."
+  :tags '(integration slow verification function)
+  (skip-unless (and (getenv "VERUS_HOME")
+                    (file-exists-p (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir))))
+  (let ((file (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir)))
+    (with-verus-file file
+                     ;; Ensure file has correct content
+                     (goto-char (point-min))
+                     (when (search-forward "assert(1 == 2)" nil t)
+                       (replace-match "assert(1 == 1)")
+                       (save-buffer))
+
+                     ;; Wait for any existing compilation to finish, then kill buffer
+                     (when (get-buffer "*compilation*")
+                       (verus-test-wait-for-compilation)
+                       (kill-buffer "*compilation*"))
+
+                     ;; Navigate to a function
+                     (goto-char (point-min))
+                     (search-forward "fn test()")
+
+                     ;; Run verification on function
+                     (verus-run-on-function-at-point 1)
+                     (verus-test-wait-for-compilation)
+
+                     ;; Check result
+                     (should (eq (verus-test-get-compilation-result) 'success))
+                     (should (get-buffer "*compilation*")))))
+
+(ert-deftest verus-integration-test-verify-function-with-error ()
+  "Test C-c C-c C-f on a function with an error."
+  :tags '(integration slow verification function)
+  (skip-unless (and (getenv "VERUS_HOME")
+                    (file-exists-p (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir))))
+  (let ((file (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir)))
+    (with-verus-file file
+                     ;; Save original content
+                     (let ((original-content (buffer-string)))
+                       ;; Introduce an error
+                       (goto-char (point-min))
+                       (search-forward "assert(1 == 1)")
+                       (replace-match "assert(1 == 2)")
+                       (save-buffer)
+
+                       ;; Wait for any existing compilation to finish, then kill buffer
+                       (when (get-buffer "*compilation*")
+                         (verus-test-wait-for-compilation)
+                         (kill-buffer "*compilation*"))
+
+                       (unwind-protect
+                           (progn
+                             ;; Navigate to the function
+                             (goto-char (point-min))
+                             (search-forward "fn test()")
+
+                             ;; Run verification on function
+                             (verus-run-on-function-at-point 1)
+                             (verus-test-wait-for-compilation)
+
+                             ;; Check that verification failed
+                             (should (eq (verus-test-get-compilation-result) 'failure))
+
+                             ;; Check that error is reported in compilation buffer
+                             (should (get-buffer "*compilation*"))
+                             (with-current-buffer "*compilation*"
+                               (goto-char (point-min))
+                               (should (search-forward "error" nil t))))
+
+                         ;; Restore file
+                         (erase-buffer)
+                         (insert original-content)
+                         (save-buffer))))))
+
+(ert-deftest verus-integration-test-verify-function-correct-directory ()
+  "Test that C-c C-c C-f uses the correct default-directory (cargo root, not src/)."
+  :tags '(integration slow verification function)
+  (skip-unless (and (getenv "VERUS_HOME")
+                    (file-exists-p (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir))))
+  (let ((file (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir))
+        (expected-root (expand-file-name "cv-crate" verus-test-examples-dir))
+        (captured-directory nil))
+    (with-verus-file file
+                     ;; Ensure file has correct content
+                     (goto-char (point-min))
+                     (when (search-forward "assert(1 == 2)" nil t)
+                       (replace-match "assert(1 == 1)")
+                       (save-buffer))
+
+                     ;; Wait for any existing compilation to finish, then kill buffer
+                     (when (get-buffer "*compilation*")
+                       (verus-test-wait-for-compilation)
+                       (kill-buffer "*compilation*"))
+
+                     ;; Navigate to a function
+                     (goto-char (point-min))
+                     (search-forward "fn test()")
+
+                     ;; Define advice function to capture default-directory
+                     (cl-flet ((capture-directory (&rest _)
+                                 (setq captured-directory default-directory)))
+                       (unwind-protect
+                           (progn
+                             (advice-add 'compile :before #'capture-directory)
+
+                             ;; Run verification on function
+                             (verus-run-on-function-at-point 1)
+                             (verus-test-wait-for-compilation)
+
+                             ;; Check that the directory used was the cargo root, not src/
+                             ;; Normalize paths for comparison (expand and remove trailing slash)
+                             (let ((normalized-captured (file-name-as-directory
+                                                         (expand-file-name captured-directory)))
+                                   (normalized-expected (file-name-as-directory expected-root)))
+                               (should (string= normalized-captured normalized-expected)))
+
+                             ;; Also verify it's not the src/ directory
+                             (let ((normalized-captured (file-name-as-directory
+                                                         (expand-file-name captured-directory)))
+                                   (src-dir (file-name-as-directory
+                                             (expand-file-name "cv-crate/src" verus-test-examples-dir)))
+                                   (foo-dir (file-name-as-directory
+                                             (expand-file-name "cv-crate/src/foo" verus-test-examples-dir))))
+                               (should-not (string= normalized-captured src-dir))
+                               (should-not (string= normalized-captured foo-dir)))
+
+                             ;; Check that compilation succeeded
+                             (should (eq (verus-test-get-compilation-result) 'success)))
+
+                         ;; Remove advice
+                         (advice-remove 'compile #'capture-directory))))))
+
 (ert-deftest verus-integration-test-verify-file-with-error ()
   "Test C-c C-c C-c on a file with an intentional error."
   :tags '(integration slow verification)
