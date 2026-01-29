@@ -690,10 +690,12 @@ returns base command for manual function specification."
 
 If PREFIX is non-nil, then confirm command to run before running it."
   (interactive "p")
-  (let ((function-name
-         (save-excursion
-           (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)[<(]" nil t)
-             (match-string 1)))))
+  (let* ((cargo-verus-root (verus--get-cargo-verus-root-directory))
+         (default-directory (or cargo-verus-root default-directory))
+         (function-name
+          (save-excursion
+            (when (re-search-backward "\\_<fn\\_>\\s-+\\([a-zA-Z0-9_]+\\)[<(]" nil t)
+              (match-string 1)))))
     (if function-name
         (let ((verus-command (with-demoted-errors "Verus error: %S"
                                (verus--run-on-function-command function-name))))
