@@ -85,9 +85,9 @@ checksum = "e9d00c22a221fbf8b3398002ebdd1c89017e5381c2f05d6933a3706d87e90e14"
 
 [[package]]
 name = "verus_builtin_macros"
-version = "0.0.0-2025-08-12-1837"
+version = "0.0.0-2025-11-10-1957"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4725e5f5c417d90aa8ac92b47daea50b8494874390491b9a957e2f8ed3fe05d7"
+checksum = "c9ab76dc4a1b1212df656b0abc00e007457f38367c665782ca299218d30b0e8f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -99,9 +99,9 @@ dependencies = [
 
 [[package]]
 name = "verus_prettyplease"
-version = "0.0.0-2025-08-12-1837"
+version = "0.0.0-2025-11-10-1957"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f62091543498033a2d17682164c789de934c42bcdc8ff497fb381c995f1cad5"
+checksum = "d09fc0da0cb81ddecb0642ae98f5239350daf4346dc1b185aee472347be44c1c"
 dependencies = [
  "proc-macro2",
  "verus_syn",
@@ -109,9 +109,9 @@ dependencies = [
 
 [[package]]
 name = "verus_state_machines_macros"
-version = "0.0.0-2025-08-12-1837"
+version = "0.0.0-2025-11-10-1957"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "734a9a8e44ddb3cf61dd80de4aee6f3cf6f46db25ad0e0b381e11d0ee8f1e077"
+checksum = "621a9925c1ae99c511065dbb2ddc2423e87a03aebd385eaea6d91b01ee306531"
 dependencies = [
  "indexmap",
  "proc-macro2",
@@ -121,9 +121,9 @@ dependencies = [
 
 [[package]]
 name = "verus_syn"
-version = "0.0.0-2025-08-12-1837"
+version = "0.0.0-2025-11-10-1957"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c30b28d965c1c0259f28a4813e1c393f126940a1051870ef75d668860a2fd0bb"
+checksum = "0fa3755d1edc7c303f5cdad50e3054635033e9bec72573fccca57c0551af3547"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -132,9 +132,9 @@ dependencies = [
 
 [[package]]
 name = "vstd"
-version = "0.0.0-2025-08-12-1837"
+version = "0.0.0-2025-11-10-1957"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b5f531340ad04fc039853c28cfe984b7baa3982aba0d37dfac01406e4d9f10f"
+checksum = "b87ed07fe544ae797b79f84de2c856ca0d20d767b3d97eac1d9999909a1f4ee9"
 dependencies = [
  "verus_builtin",
  "verus_builtin_macros",

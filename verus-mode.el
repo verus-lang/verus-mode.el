@@ -5,7 +5,7 @@
 ;; URL: https://github.com/verus-lang/verus-mode.el
 
 ;; Created: 13 Feb 2023
-;; Version: 0.8.1
+;; Version: 0.9.0
 ;; Package-Requires: ((emacs "28.2") (rustic "3.0") (f "0.20.0") (flycheck "30.0") (dumb-jump "0.5.4") (tomlparse "1.0.0"))
 ;; Keywords: convenience, languages
 
@@ -527,10 +527,23 @@ ones are relative to the Cargo.toml)."
                               (verus--path-shift-relative last root cwd))
                     arg))) args))))
 
-(defun verus--cargo-verus-command (args)
+(defun verus--get-package-name (toml-file)
+  "Extract the package name from TOML-FILE (Cargo.toml).
+Returns the package name as a string, or nil if not found."
+  (when (and toml-file (file-exists-p toml-file))
+    (let* ((toml (tomlparse-file toml-file :object-type 'alist))
+           (package (cdr (assoc 'package toml)))
+           (name (cdr (assoc 'name package))))
+      name)))
+
+(defun verus--cargo-verus-command (args &optional package)
   "Build cargo-verus command with ARGS.
+If PACKAGE is non-nil, adds -p PACKAGE to target a specific workspace member.
 Returns a list of command-line arguments for cargo verus verify."
-  (append (list "cargo" "verus" "verify" "--") args))
+  (append (list "cargo" "verus" "verify")
+          (when package (list "-p" package))
+          (list "--")
+          args))
 
 (defun verus--run-on-crate-command ()
   "Return the command to run Verus on the current crate.
@@ -546,10 +559,15 @@ buffer visiting the file, otherwise throws an error."
            (cargo-toml (when cargo-toml-root (f-join cargo-toml-root "Cargo.toml")))
            (use-cargo-verus (and cargo-toml (verus--is-cargo-verus-project-p cargo-toml))))
       (if use-cargo-verus
-          (let ((default-directory cargo-toml-root))
+          (let* ((default-directory cargo-toml-root)
+                 (workspace-root (verus--find-workspace-root cargo-toml-root))
+                 ;; If in a workspace, get the package name from the current crate's Cargo.toml
+                 (package-name (when workspace-root
+                                 (verus--get-package-name cargo-toml))))
             (verus--cargo-verus-command
              ;; TODO(jayb): Should we actually also be passing the `verus--extra-args-from-cargo-toml' here?
-             nil))
+             nil
+             package-name))
         (append
          (list verus--rust-verify)
          (if (string-suffix-p "lib.rs" crate-root)
@@ -701,18 +719,26 @@ If PREFIX is non-nil, then confirm command to run before running it."
   :command ("cargo"
             "verus"
             "verify"
-            "--message-format=short"
+            "--message-format=json"
+            (eval
+             ;; Extract -p flag and package name if present
+             (let* ((full-cmd (verus--run-on-file-command))
+                    (dash-dash-pos (cl-position "--" full-cmd :test #'string=))
+                    ;; Get everything between "verify" and "--"
+                    (cargo-flags (when dash-dash-pos
+                                   (cl-subseq full-cmd 3 dash-dash-pos))))
+               cargo-flags))
             "--"
             (eval
-             (let ((args (nthcdr 4 (verus--run-on-file-command))))
+             ;; Get verus arguments (everything after "--")
+             (let* ((full-cmd (verus--run-on-file-command))
+                    (dash-dash-pos (cl-position "--" full-cmd :test #'string=))
+                    (args (when dash-dash-pos
+                            (nthcdr (1+ dash-dash-pos) full-cmd))))
                (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
             "--expand-errors")
-  :error-patterns
-  ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
-   (error (file-name) ":" line ":" column ": error: " (message) line-end)
-   (warning (file-name) ":" line ":" column ": warning[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
-   (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
-   (info (file-name) ":" line ":" column ": note: " (message) line-end))
+  :error-parser flycheck-parse-cargo-rustc
+  :error-filter flycheck-rust-error-filter
   :working-directory (lambda (checker)
                        (or (verus--get-cargo-verus-root-directory)
                            default-directory))
@@ -729,14 +755,10 @@ If PREFIX is non-nil, then confirm command to run before running it."
             (eval
              (let ((args (cdr (verus--run-on-file-command))))
                (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
-            "--error-format=short"
+            "--error-format=json"
             "--expand-errors")
-  :error-patterns
-  ((error (file-name) ":" line ":" column ": error[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
-   (error (file-name) ":" line ":" column ": error: " (message) line-end)
-   (warning (file-name) ":" line ":" column ": warning[" (id (one-or-more (not (any "]")))) "]: " (message) line-end)
-   (warning (file-name) ":" line ":" column ": warning: " (message) line-end)
-   (info (file-name) ":" line ":" column ": note: " (message) line-end))
+  :error-parser flycheck-parse-cargo-rustc
+  :error-filter flycheck-rust-error-filter
   :predicate (lambda ()
                (and
                 (flycheck-buffer-saved-p)
