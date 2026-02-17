@@ -616,6 +616,27 @@ Uses the compilation exit status which works for both single crates and workspac
                            (insert original-content)
                            (save-buffer)))))))
 
+;;; verus-cargo-verus-arguments Tests
+
+(ert-deftest verus-integration-test-cargo-verus-arguments ()
+  "Test that verus-cargo-verus-arguments are passed through to the compile command."
+  :tags '(integration verification)
+  (skip-unless (file-exists-p (expand-file-name "cv-crate/src/lib.rs" verus-test-examples-dir)))
+  (let ((file (expand-file-name "cv-crate/src/lib.rs" verus-test-examples-dir))
+        (captured-command nil))
+    (with-verus-file file
+      (let ((verus-cargo-verus-arguments '("--" "--expand-errors")))
+        (cl-flet ((capture-command (command &rest _)
+                    (setq captured-command command)))
+          (unwind-protect
+              (progn
+                (advice-add 'compile :before #'capture-command)
+                (verus-run-on-file 1)
+                (verus-test-wait-for-compilation))
+            (advice-remove 'compile #'capture-command))))
+      (should (stringp captured-command))
+      (should (string-match-p "^cargo verus verify -- --expand-errors" captured-command)))))
+
 ;;; Run All Integration Tests
 
 (defun verus-run-integration-tests ()
