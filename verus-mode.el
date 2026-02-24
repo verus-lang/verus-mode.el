@@ -166,6 +166,25 @@ removed at any time."
   :group 'verus
   :type 'boolean)
 
+(defcustom verus-cargo-verus-arguments nil
+  "Extra arguments to pass to `cargo verus verify', as a list of strings.
+
+When non-nil, this list is appended directly to the `cargo verus verify'
+invocation instead of the default `--' separator.  The list MUST contain
+`--' at the correct position to separate cargo-verus flags from Verus
+flags; an error is signalled if it does not.
+
+Example `.dir-locals.el' usage:
+
+  ((verus-mode . ((verus-cargo-verus-arguments
+                   . (\"--features\" \"foo\" \"--\" \"--expand-errors\")))))
+
+The `--features foo' part is interpreted by cargo-verus, while
+`--expand-errors' is forwarded to the Verus binary."
+  :group 'verus
+  :type '(repeat string)
+  :safe #'listp)
+
 ;;; Keymaps
 
 (defvar verus-mode-map
@@ -536,14 +555,25 @@ Returns the package name as a string, or nil if not found."
            (name (cdr (assoc 'name package))))
       name)))
 
-(defun verus--cargo-verus-command (args &optional package)
-  "Build cargo-verus command with ARGS.
+(defun verus--cargo-verus-command (&optional package)
+  "Build cargo-verus command.
 If PACKAGE is non-nil, adds -p PACKAGE to target a specific workspace member.
-Returns a list of command-line arguments for cargo verus verify."
-  (append (list "cargo" "verus" "verify")
-          (when package (list "-p" package))
-          (list "--")
-          args))
+Returns a list of command-line arguments for cargo verus verify.
+
+When `verus-cargo-verus-arguments' is non-nil it is appended in place of the
+default `--' separator.  The list must contain `--' at the appropriate
+position; an error is signalled otherwise."
+  (if verus-cargo-verus-arguments
+      (progn
+        (unless (member "--" verus-cargo-verus-arguments)
+          (error "verus-cargo-verus-arguments must contain \"--\" to separate \
+cargo-verus flags from Verus flags (e.g. (\"--features\" \"foo\" \"--\" \"--expand-errors\"))"))
+        (append (list "cargo" "verus" "verify")
+                (when package (list "-p" package))
+                verus-cargo-verus-arguments))
+    (append (list "cargo" "verus" "verify")
+            (when package (list "-p" package))
+            (list "--"))))
 
 (defun verus--run-on-crate-command ()
   "Return the command to run Verus on the current crate.
@@ -564,10 +594,7 @@ buffer visiting the file, otherwise throws an error."
                  ;; If in a workspace, get the package name from the current crate's Cargo.toml
                  (package-name (when workspace-root
                                  (verus--get-package-name cargo-toml))))
-            (verus--cargo-verus-command
-             ;; TODO(jayb): Should we actually also be passing the `verus--extra-args-from-cargo-toml' here?
-             nil
-             package-name))
+            (verus--cargo-verus-command package-name))
         (append
          (list verus--rust-verify)
          (if (string-suffix-p "lib.rs" crate-root)
