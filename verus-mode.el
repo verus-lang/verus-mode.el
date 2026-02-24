@@ -721,7 +721,6 @@ If PREFIX is non-nil, then confirm command to run before running it."
   :command ("cargo"
             "verus"
             "verify"
-            "--message-format=json"
             (eval
              ;; Extract -p flag and package name if present
              (let* ((full-cmd (verus--run-on-file-command))
@@ -730,6 +729,7 @@ If PREFIX is non-nil, then confirm command to run before running it."
                     (cargo-flags (when dash-dash-pos
                                    (cl-subseq full-cmd 3 dash-dash-pos))))
                cargo-flags))
+            "--message-format=json"
             "--"
             (eval
              ;; Get verus arguments (everything after "--")
