@@ -5,6 +5,7 @@ set -e
 
 # Parse arguments
 PATTERN="${1:-}"
+SKIP_CACHE_PRIMING="${SKIP_CACHE_PRIMING:-}"
 
 # Color output
 RED='\033[0;31m'
@@ -69,12 +70,78 @@ fi
 echo "Using sandbox: $SANDBOX_DIR"
 echo ""
 
+cd "$PROJECT_ROOT"
+
+# Prime Verus caches before running tests.
+#
+# On a cold run, the first verification of each example project can take much
+# longer than flycheck's/the tests' timeouts (dependency builds, vstd fetching
+# and verification, etc.), which causes spurious test failures.  Running the
+# same commands the tests would trigger, ahead of time and without a timeout,
+# ensures the caches are warm by the time the tests actually run.
+prime_caches() {
+    local verus_bin=""
+    local loc
+    for loc in "source/target-verus/release/verus" \
+        "source/target-verus/debug/verus" \
+        "source/target-verus/release/verus.exe" \
+        "source/target-verus/debug/verus.exe" \
+        "source/tools/rust-verify.sh"; do
+        if [ -x "$VERUS_HOME/$loc" ]; then
+            verus_bin="$VERUS_HOME/$loc"
+            break
+        fi
+    done
+
+    if [ -z "$verus_bin" ]; then
+        echo -e "${RED}ERROR: Could not find a Verus binary under $VERUS_HOME${NC}"
+        exit 1
+    fi
+
+    local examples="$PROJECT_ROOT/verus-examples"
+
+    # Standalone files/crates, verified directly with the Verus binary.
+    run_prime "$examples" "$verus_bin" syntax.rs
+    run_prime "$examples/crate" "$verus_bin" --crate-type=lib src/lib.rs
+
+    # cargo-verus projects, verified through `cargo verus'.  We run both
+    # `verify' and `focus' (the latter with the same flags flycheck uses),
+    # since they build/cache different artifacts.
+    run_prime "$examples/cv-crate" cargo verus verify --
+    run_prime "$examples/cv-crate" cargo verus focus --message-format=json -- \
+        --verify-module foo::bar --expand-errors
+    run_prime "$examples/cv-crate" cargo verus focus --message-format=json -- \
+        --verify-root --expand-errors
+    run_prime "$examples/cv-workspace" cargo verus verify -p member1 --message-format=json -- --expand-errors
+    run_prime "$examples/cv-workspace" cargo verus verify -p member2 --message-format=json -- --expand-errors
+}
+
+# Run a cache-priming command in a given directory; failures are non-fatal,
+# since some examples intentionally contain verification errors.
+run_prime() {
+    local dir="$1"
+    shift
+    echo -e "  ${GREEN}[$(basename "$dir")]${NC} $*"
+    if [ -n "$VERBOSE" ]; then
+        (cd "$dir" && "$@") || true
+    else
+        (cd "$dir" && "$@") >/dev/null 2>&1 || true
+    fi
+}
+
+if [ -z "$SKIP_CACHE_PRIMING" ]; then
+    echo -e "${YELLOW}Priming Verus caches (this may take a while on a cold run)...${NC}"
+    prime_caches
+    echo ""
+else
+    echo -e "${YELLOW}Skipping cache priming (SKIP_CACHE_PRIMING is set)${NC}"
+    echo ""
+fi
+
 # Run tests using with-emacs.sh
 echo ""
 echo -e "${YELLOW}Running integration tests...${NC}"
 echo ""
-
-cd "$PROJECT_ROOT"
 
 # Build emacs args
 EMACS_ARGS=(
