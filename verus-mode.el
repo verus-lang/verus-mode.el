@@ -565,17 +565,13 @@ When `verus-cargo-verus-arguments' is non-nil it is appended in place of the
 default `--' separator.  The list must contain `--' at the appropriate
 position; an error is signalled otherwise."
   (let ((subcommand (or subcommand "verify")))
-    (if verus-cargo-verus-arguments
-        (progn
-          (unless (member "--" verus-cargo-verus-arguments)
-            (error "verus-cargo-verus-arguments must contain \"--\" to separate \
+    (when (and verus-cargo-verus-arguments
+               (not (member "--" verus-cargo-verus-arguments)))
+      (error "verus-cargo-verus-arguments must contain \"--\" to separate \
 cargo-verus flags from Verus flags (e.g. (\"--features\" \"foo\" \"--\" \"--expand-errors\"))"))
-          (append (list "cargo" "verus" subcommand)
-                  (when package (list "-p" package))
-                  verus-cargo-verus-arguments))
-      (append (list "cargo" "verus" subcommand)
-              (when package (list "-p" package))
-              (list "--")))))
+    (append (list "cargo" "verus" subcommand)
+            (when package (list "-p" package))
+            (or verus-cargo-verus-arguments (list "--")))))
 
 (defun verus--run-on-crate-command (&optional cargo-verus-subcommand)
   "Return the command to run Verus on the current crate.
