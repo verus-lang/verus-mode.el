@@ -130,6 +130,9 @@ if [ $TEST_RESULT -eq 0 ]; then
     echo -e "${GREEN}✓ All tests passed!${NC}"
 else
     echo -e "${RED}✗ Some tests failed${NC}"
+    echo -e "${YELLOW}Hint: make sure you have a recent version of Verus, and that the vstd"
+    echo -e "versions pinned in verus-examples/*/Cargo.toml match it. To update them, run:"
+    echo -e "    ./verus-examples/update-verus-versions.sh${NC}"
 fi
 
 exit $TEST_RESULT
