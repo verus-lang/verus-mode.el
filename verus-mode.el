@@ -595,7 +595,7 @@ buffer visiting the file, otherwise throws an error."
                  ;; If in a workspace, get the package name from the current crate's Cargo.toml
                  (package-name (when workspace-root
                                  (verus--get-package-name cargo-toml))))
-                (verus--cargo-verus-command package-name cargo-verus-subcommand))
+            (verus--cargo-verus-command package-name cargo-verus-subcommand))
         (append
          (list verus--rust-verify)
          (if (string-suffix-p "lib.rs" crate-root)
