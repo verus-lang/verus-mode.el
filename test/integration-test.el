@@ -618,69 +618,48 @@ Uses the compilation exit status which works for both single crates and workspac
 
 ;;; cargo-verus Command Tests
 
-(defmacro with-verus-test-cargo-verus-project (&rest body)
-  "Run BODY as though Cargo.toml describes a standalone cargo-verus project."
-  (declare (indent 0))
-  `(cl-letf (((symbol-function 'tomlparse-file)
-              (lambda (&rest _args)
-                '((package . ((metadata . ((verus . ((verify . t)))))))))))
-     ,@body))
-
 (ert-deftest verus-integration-test-cargo-verus-focus-module ()
   "Test that cargo-verus uses focus when verifying a module."
   :tags '(integration verification)
   (skip-unless (file-exists-p (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir)))
   (let ((file (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir)))
-    (with-verus-test-cargo-verus-project
-      (with-temp-buffer
-        (setq buffer-file-name file
-              default-directory (file-name-directory file))
-        (should (equal (verus--run-on-file-command)
-                       '("cargo" "verus" "focus" "--"
-                         "--verify-module" "foo::bar")))))))
+    (with-verus-file file
+      (should (equal (verus--run-on-file-command)
+                     '("cargo" "verus" "focus" "--"
+                       "--verify-module" "foo::bar"))))))
 
 (ert-deftest verus-integration-test-cargo-verus-focus-root ()
   "Test that cargo-verus uses focus when verifying a crate root."
   :tags '(integration verification)
   (skip-unless (file-exists-p (expand-file-name "cv-crate/src/lib.rs" verus-test-examples-dir)))
   (let ((file (expand-file-name "cv-crate/src/lib.rs" verus-test-examples-dir)))
-    (with-verus-test-cargo-verus-project
-      (with-temp-buffer
-        (setq buffer-file-name file
-              default-directory (file-name-directory file))
-        (should (equal (verus--run-on-file-command)
-                       '("cargo" "verus" "focus" "--" "--verify-root")))))))
+    (with-verus-file file
+      (should (equal (verus--run-on-file-command)
+                     '("cargo" "verus" "focus" "--" "--verify-root"))))))
 
 (ert-deftest verus-integration-test-cargo-verus-focus-function ()
   "Test that cargo-verus uses focus when verifying a function."
   :tags '(integration verification)
   (skip-unless (file-exists-p (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir)))
   (let ((file (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir)))
-    (with-verus-test-cargo-verus-project
-      (with-temp-buffer
-        (insert-file-contents file)
-        (setq buffer-file-name file
-              default-directory (file-name-directory file))
-        (should (equal (verus--run-on-function-command "test")
-                       '("cargo" "verus" "focus" "--"
-                         "--verify-only-module" "foo::bar"
-                         "--verify-function" "test")))))))
+    (with-verus-file file
+      (should (equal (verus--run-on-function-command "test")
+                     '("cargo" "verus" "focus" "--"
+                       "--verify-only-module" "foo::bar"
+                       "--verify-function" "test"))))))
 
 (ert-deftest verus-integration-test-cargo-verus-flycheck-subcommand ()
   "Test that Flycheck uses the subcommand selected for file verification."
   :tags '(integration flycheck verification)
   (skip-unless (file-exists-p (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir)))
   (let ((file (expand-file-name "cv-crate/src/foo/bar.rs" verus-test-examples-dir)))
-    (with-verus-test-cargo-verus-project
-      (with-temp-buffer
-        (setq buffer-file-name file
-              default-directory (file-name-directory file))
-        (should
-         (equal
-          (cons (flycheck-checker-executable 'verus-cargo)
-                (flycheck-checker-substituted-arguments 'verus-cargo))
-          '("cargo" "verus" "focus" "--message-format=json" "--"
-            "--verify-module" "foo::bar" "--expand-errors"))))))
+    (with-verus-file file
+      (should
+       (equal
+        (cons (flycheck-checker-executable 'verus-cargo)
+              (flycheck-checker-substituted-arguments 'verus-cargo))
+        '("cargo" "verus" "focus" "--message-format=json" "--"
+          "--verify-module" "foo::bar" "--expand-errors")))))
   (cl-letf (((symbol-function 'verus--run-on-file-command)
              (lambda () '("cargo" "verus" "verify" "--"))))
     (should
@@ -697,14 +676,11 @@ Uses the compilation exit status which works for both single crates and workspac
   :tags '(integration verification)
   (skip-unless (file-exists-p (expand-file-name "cv-crate/src/lib.rs" verus-test-examples-dir)))
   (let ((file (expand-file-name "cv-crate/src/lib.rs" verus-test-examples-dir)))
-    (with-verus-test-cargo-verus-project
-      (with-temp-buffer
-        (setq buffer-file-name file
-              default-directory (file-name-directory file))
-        (let ((verus-cargo-verus-arguments '("--" "--expand-errors")))
-          (should (equal (verus--run-on-file-command)
-                         '("cargo" "verus" "focus" "--" "--expand-errors"
-                           "--verify-root"))))))))
+    (with-verus-file file
+      (let ((verus-cargo-verus-arguments '("--" "--expand-errors")))
+        (should (equal (verus--run-on-file-command)
+                       '("cargo" "verus" "focus" "--" "--expand-errors"
+                         "--verify-root")))))))
 
 ;;; Run All Integration Tests
 
