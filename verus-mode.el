@@ -167,12 +167,12 @@ removed at any time."
   :type 'boolean)
 
 (defcustom verus-cargo-verus-arguments nil
-  "Extra arguments to pass to `cargo verus verify', as a list of strings.
+  "Extra arguments to pass to cargo-verus commands, as a list of strings.
 
-When non-nil, this list is appended directly to the `cargo verus verify'
-invocation instead of the default `--' separator.  The list MUST contain
-`--' at the correct position to separate cargo-verus flags from Verus
-flags; an error is signalled if it does not.
+When non-nil, this list is appended directly to the `cargo verus verify' or
+`cargo verus focus' invocation instead of the default `--' separator.  The
+list MUST contain `--' at the correct position to separate cargo-verus flags
+from Verus flags; an error is signalled if it does not.
 
 Example `.dir-locals.el' usage:
 
@@ -555,28 +555,33 @@ Returns the package name as a string, or nil if not found."
            (name (cdr (assoc 'name package))))
       name)))
 
-(defun verus--cargo-verus-command (&optional package)
+(defun verus--cargo-verus-command (&optional package subcommand)
   "Build cargo-verus command.
 If PACKAGE is non-nil, adds -p PACKAGE to target a specific workspace member.
-Returns a list of command-line arguments for cargo verus verify.
+SUBCOMMAND defaults to `verify'.
+Returns a list of command-line arguments for cargo verus SUBCOMMAND.
 
 When `verus-cargo-verus-arguments' is non-nil it is appended in place of the
 default `--' separator.  The list must contain `--' at the appropriate
 position; an error is signalled otherwise."
-  (if verus-cargo-verus-arguments
-      (progn
-        (unless (member "--" verus-cargo-verus-arguments)
-          (error "verus-cargo-verus-arguments must contain \"--\" to separate \
+  (let ((subcommand (or subcommand "verify")))
+    (if verus-cargo-verus-arguments
+        (progn
+          (unless (member "--" verus-cargo-verus-arguments)
+            (error "verus-cargo-verus-arguments must contain \"--\" to separate \
 cargo-verus flags from Verus flags (e.g. (\"--features\" \"foo\" \"--\" \"--expand-errors\"))"))
-        (append (list "cargo" "verus" "verify")
-                (when package (list "-p" package))
-                verus-cargo-verus-arguments))
-    (append (list "cargo" "verus" "verify")
-            (when package (list "-p" package))
-            (list "--"))))
+          (append (list "cargo" "verus" subcommand)
+                  (when package (list "-p" package))
+                  verus-cargo-verus-arguments))
+      (append (list "cargo" "verus" subcommand)
+              (when package (list "-p" package))
+              (list "--")))))
 
-(defun verus--run-on-crate-command ()
+(defun verus--run-on-crate-command (&optional cargo-verus-subcommand)
   "Return the command to run Verus on the current crate.
+
+If CARGO-VERUS-SUBCOMMAND is non-nil, use it instead of `verify' for
+cargo-verus projects.
 
 Returns a list of command-line arguments. Expects to be run in a
 buffer visiting the file, otherwise throws an error."
@@ -594,7 +599,7 @@ buffer visiting the file, otherwise throws an error."
                  ;; If in a workspace, get the package name from the current crate's Cargo.toml
                  (package-name (when workspace-root
                                  (verus--get-package-name cargo-toml))))
-            (verus--cargo-verus-command package-name))
+                (verus--cargo-verus-command package-name cargo-verus-subcommand))
         (append
          (list verus--rust-verify)
          (if (string-suffix-p "lib.rs" crate-root)
@@ -631,15 +636,17 @@ buffer visiting the file, otherwise throws an error."
     ;; Use the file's directory as default-directory for finding crate root,
     ;; since the caller may have set default-directory to the workspace root
     (let ((default-directory (f-dirname file)))
-      (append
-       (verus--run-on-crate-command)
-       (cond
-        ;; In workspace: skip subsetting arguments due to issue verus#1938
-        ((verus--is-in-cargo-verus-workspace) nil)
-        ((string= file (verus--crate-root-file))
-         (list "--verify-root"))
-        (t
-         (list "--verify-module" (verus--current-module-name))))))))
+      (let ((verify-args
+             (cond
+              ;; In workspace: skip subsetting arguments due to issue verus#1938
+              ((verus--is-in-cargo-verus-workspace) nil)
+              ((string= file (verus--crate-root-file))
+               (list "--verify-root"))
+              (t
+               (list "--verify-module" (verus--current-module-name))))))
+        (append
+         (verus--run-on-crate-command (when verify-args "focus"))
+         verify-args)))))
 
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
@@ -691,8 +698,10 @@ If PREFIX is non-nil, then enable `always profiling' mode."
 
 Returns a list of command-line arguments. If FUNCTION-NAME is nil,
 returns base command for manual function specification."
-  (let ((base-command (verus--run-on-crate-command)))
-    (if (verus--is-in-cargo-verus-workspace)
+  (let* ((in-workspace (verus--is-in-cargo-verus-workspace))
+         (base-command (verus--run-on-crate-command
+                        (unless in-workspace "focus"))))
+    (if in-workspace
         (progn
           (message "Function/module subsetting is unsupported on workspace crates until https://github.com/verus-lang/verus/issues/1938 is resolved. Verifying entire workspace instead.")
           base-command)
@@ -744,15 +753,15 @@ If PREFIX is non-nil, then confirm command to run before running it."
 ;;; Flycheck setup
 
 (flycheck-define-checker verus-cargo
-  "A Verus syntax checker using cargo verus verify."
+  "A Verus syntax checker using cargo-verus."
   :command ("cargo"
             "verus"
-            "verify"
+            (eval (nth 2 (verus--run-on-file-command)))
             (eval
              ;; Extract -p flag and package name if present
              (let* ((full-cmd (verus--run-on-file-command))
                     (dash-dash-pos (cl-position "--" full-cmd :test #'string=))
-                    ;; Get everything between "verify" and "--"
+                    ;; Get everything between the subcommand and "--"
                     (cargo-flags (when dash-dash-pos
                                    (cl-subseq full-cmd 3 dash-dash-pos))))
                cargo-flags))
