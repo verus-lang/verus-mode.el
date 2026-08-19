@@ -114,8 +114,7 @@ May be either nil (use $VERUS_HOME) or an absolute path."
   '("source/target-verus/release/verus"
     "source/target-verus/debug/verus"
     "source/target-verus/release/verus.exe"
-    "source/target-verus/debug/verus.exe"
-    "source/tools/rust-verify.sh")
+    "source/target-verus/debug/verus.exe")
   "Locations to find the Verus verification script, relative to `verus-home'.
 
 These are checked in-order to figure out how to run Verus."
@@ -287,7 +286,7 @@ The `--features foo' part is interpreted by cargo-verus, while
 ;; TODO FIXME: Get rustic to actually use the right lsp server
 (defvar-local verus--old-lsp-server rustic-lsp-server)
 (defvar-local verus--old-rutic-analyzer-command rustic-analyzer-command)
-(defvar-local verus--rust-verify nil)
+(defvar-local verus--verus-binary nil)
 
 (defun verus--setup ()
   "Setup Verus mode."
@@ -295,16 +294,14 @@ The `--features foo' part is interpreted by cargo-verus, while
       (setq verus-home (getenv "VERUS_HOME")))
   (if (or (not verus-home) (not (file-exists-p verus-home)))
       (error "Verus home directory %s does not exist" verus-home))
-  (setq verus--rust-verify
+  (setq verus--verus-binary
         (cl-find-if #'file-executable-p
                     (mapcar (lambda (loc) (f-join verus-home loc))
                             verus-verify-locations)))
-  (when (not verus--rust-verify)
+  (when (not verus--verus-binary)
     (error "Could not find way to execute Verus in any of the following locations: %s"
            (mapcar (lambda (loc) (f-join verus-home loc))
                    verus-verify-locations)))
-  (when (string-suffix-p "rust-verify.sh" verus--rust-verify)
-    (message "WARNING: You are using an old version of Verus.  This may soon be unsupported.  Please update to the latest version."))
   (when (not verus-enable-experimental-features)
     ;; Disable rustic's lsp setup, since we don't yet have LSP support in
     ;; non-experimental mode; this way, we remove the annoying lsp pop up.
@@ -597,7 +594,7 @@ buffer visiting the file, otherwise throws an error."
                                  (verus--get-package-name cargo-toml))))
             (verus--cargo-verus-command package-name cargo-verus-subcommand))
         (append
-         (list verus--rust-verify)
+         (list verus--verus-binary)
          (if (string-suffix-p "lib.rs" crate-root)
              (list "--crate-type=lib"))
          (if (string-suffix-p "vstd.rs" crate-root)
@@ -786,7 +783,7 @@ If PREFIX is non-nil, then confirm command to run before running it."
 
 (flycheck-define-checker verus
   "A Verus syntax checker using the Verus compiler."
-  :command ("rust-verify.sh"
+  :command ("verus"
             (eval
              (let ((args (cdr (verus--run-on-file-command))))
                (seq-filter (lambda (x) (not (string= x "--expand-errors"))) args)))
@@ -806,7 +803,7 @@ If PREFIX is non-nil, then confirm command to run before running it."
   "Setup Flycheck for Verus."
   (add-to-list 'flycheck-checkers 'verus-cargo)
   (add-to-list 'flycheck-checkers 'verus)
-  (setq flycheck-verus-executable verus--rust-verify))
+  (setq flycheck-verus-executable verus--verus-binary))
 
 ;;; Automatic version checking
 
