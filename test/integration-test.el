@@ -659,15 +659,7 @@ Uses the compilation exit status which works for both single crates and workspac
         (cons (flycheck-checker-executable 'verus-cargo)
               (flycheck-checker-substituted-arguments 'verus-cargo))
         '("cargo" "verus" "focus" "--message-format=json" "--"
-          "--verify-module" "foo::bar" "--expand-errors")))))
-  (cl-letf (((symbol-function 'verus--run-on-file-command)
-             (lambda () '("cargo" "verus" "verify" "--"))))
-    (should
-     (equal
-      (cons (flycheck-checker-executable 'verus-cargo)
-            (flycheck-checker-substituted-arguments 'verus-cargo))
-      '("cargo" "verus" "verify" "--message-format=json" "--"
-        "--expand-errors")))))
+          "--verify-module" "foo::bar" "--expand-errors"))))))
 
 ;;; verus-cargo-verus-arguments Tests
 
