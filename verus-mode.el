@@ -631,18 +631,19 @@ buffer visiting the file, otherwise throws an error."
       (error "Buffer is not visiting a file. Cannot run Verus"))
     ;; Use the file's directory as default-directory for finding crate root,
     ;; since the caller may have set default-directory to the workspace root
-    (let ((default-directory (f-dirname file)))
-      (let ((verify-args
-             (cond
-              ;; In workspace: skip subsetting arguments due to issue verus#1938
-              ((verus--is-in-cargo-verus-workspace) nil)
-              ((string= file (verus--crate-root-file))
-               (list "--verify-root"))
-              (t
-               (list "--verify-module" (verus--current-module-name))))))
-        (append
-         (verus--run-on-crate-command (when verify-args "focus"))
-         verify-args)))))
+    (let* ((default-directory (f-dirname file))
+           (verify-args
+            (cond
+             ;; In workspace: skip subsetting arguments due to issue verus#1938
+             ((verus--is-in-cargo-verus-workspace) nil)
+             ((string= file (verus--crate-root-file))
+              (list "--verify-root"))
+             (t
+              (list "--verify-module" (verus--current-module-name))))))
+      (append
+       ;; Use `focus' exactly when we pass subsetting arguments.
+       (verus--run-on-crate-command (when verify-args "focus"))
+       verify-args))))
 
 (defun verus-run-on-crate (prefix)
   "Run Verus on the current crate.
